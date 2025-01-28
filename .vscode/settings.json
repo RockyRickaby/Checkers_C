@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "stdio.h": "c",
+        "checkers_board.h": "c",
+        "terminal_ui.h": "c",
+        "checkers.h": "c"
+    }
+}
