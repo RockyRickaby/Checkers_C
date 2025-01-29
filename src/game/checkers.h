@@ -68,7 +68,7 @@ int checkersInit(struct Checkers* game, int forceCapture);
 int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to);
 int checkersGetCurrentPlayer(struct Checkers* game);
 int checkersGetWinner(struct Checkers* game);
-int checkersGetClosestEnemies(struct Checkers* game, struct Point playerPos, struct Point** enemiesPos); /* receives output buffer and returns size */
+// int checkersGetClosestEnemies(struct Checkers* game, struct Point playerPos, struct Point* enemiesPos); /* receives output buffer and returns size */
 int checkersPlayerShallCapture(struct Checkers* game);
 void checkersPrint(struct Checkers* game);
 

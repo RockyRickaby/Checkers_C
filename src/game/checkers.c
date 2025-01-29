@@ -254,15 +254,6 @@ int checkersGetWinner(struct Checkers* game) {
     }
 }
 
-/* receives output buffer and returns size */
-int checkersGetClosestEnemies(struct Checkers* game, struct Point playerPos, struct Point** enemiesPos) {
-    if (!enemiesPos || !game || !game->flags.forceCapture) {
-        return -1;
-    }
-    // TODO - get closest enemies
-    return 0;
-}
-
 int checkersPlayerShallCapture(struct Checkers* game) {
     if (!game || !game->flags.run || !game->flags.forceCapture) {
         return 0;
