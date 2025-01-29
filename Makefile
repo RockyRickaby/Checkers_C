@@ -18,7 +18,7 @@ LFLAGS =
 OUTPUT	:= output
 
 # define source directory
-SRC		:= src src/game src/terminal_ui src/gui
+SRC		:= src src/*
 
 # define include directory
 INCLUDE	:= include
