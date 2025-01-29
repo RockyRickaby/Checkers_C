@@ -14,9 +14,9 @@
 #define CHECKERS_INVALID_MOVE       -3
 #define CHECKERS_INVALID_PLAYER     -4
 #define CHECKERS_NOT_A_PIECE        -5
-#define CHECKERS_NULL_MOVES_LIST    -6
-#define CHECKERS_EMPTY_MOVES_LIST   -7
-#define CHECKERS_INVALID_MOVES_LIST -8
+// #define CHECKERS_NULL_MOVES_LIST    -6
+// #define CHECKERS_EMPTY_MOVES_LIST   -7
+// #define CHECKERS_INVALID_MOVES_LIST -8
 
 #include <stddef.h>
 

@@ -4,6 +4,10 @@
 
 #include "checkers.h"
 
+#define BLK "\e[0;30m"
+#define BWHT "\e[1;37m"
+#define CRESET "\e[0m"
+
 static int movePiece(struct Board* gameboard, int player, struct Point piecePos, struct Point newPos);
 static int checkIfPlayerShouldCapture(struct Checkers* game, int player, struct Point pos);
 
@@ -35,18 +39,10 @@ int boardInit(struct Board* gameboard) {
     // adding dark pieces
     for (int i = 0; i < (CHECKERS_BOARD_SIZE - 2) / 2; i++) {
         for (int j = 0; j < CHECKERS_BOARD_SIZE; j++) {
-            if (i % 2 == 0) {
-                if (j % 2 == 1) {
-                    gameboard->board[i][j] = gameboard->pieceDarkMan;
-                } else {
-                    gameboard->board[i][j] = gameboard->blank;
-                }
+            if ((i + j) % 2 == 1) {
+                gameboard->board[i][j] = gameboard->pieceDarkMan;
             } else {
-                if (j % 2 == 0) {
-                    gameboard->board[i][j] = gameboard->pieceDarkMan;
-                } else {
-                    gameboard->board[i][j] = gameboard->blank;
-                }
+                gameboard->board[i][j] = gameboard->blank;
             }
         }
     }
@@ -54,14 +50,10 @@ int boardInit(struct Board* gameboard) {
     // adding light pieces
     for (int i = (CHECKERS_BOARD_SIZE - 2) / 2 + 2; i < CHECKERS_BOARD_SIZE; i++) {
         for (int j = 0; j < CHECKERS_BOARD_SIZE; j++) {
-            if (i % 2 == 0) {
-                if (j % 2 == 1) {
-                    gameboard->board[i][j] = gameboard->pieceLightMan;
-                }
+            if ((i + j) % 2 == 1) {
+                gameboard->board[i][j] = gameboard->pieceLightMan;
             } else {
-                if (j % 2 == 0) {
-                    gameboard->board[i][j] = gameboard->pieceLightMan;
-                }
+                gameboard->board[i][j] = gameboard->blank;
             }
         }
     }
@@ -192,45 +184,40 @@ int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to) 
     if (!game || !game->flags.run) {
         return 0;
     }
+
+    int player, enemy;
+    enum GameState nextStateWin, nextStatePlayer;
     if (game->state == CSTATE_P1_TURN) {
-        int status = boardTryMoveOrCapture(&game->checkersBoard, CHECKERS_PLAYER_ONE, from, to);
-        if (status == CHECKERS_CAPTURE_SUCCESS) {
-            if (boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_TWO) == 0) {
-                game->state = CSTATE_END_P1_WIN;
-                game->flags.run = 0;
-                game->turnsTotal += 1;
-            } else if (game->flags.forceCapture && checkIfPlayerShouldCapture(game, checkersGetCurrentPlayer(game), to)) {
-                game->turnsTotal += 1;
-            } else {
-                game->turnsTotal += 1;
-                game->state = CSTATE_P2_TURN;
-            }
-        } else if (status == CHECKERS_MOVE_SUCCESS) {
-            game->turnsTotal += 1;
-            game->state = CSTATE_P2_TURN;
-        }
-        return status;
+        player = CHECKERS_PLAYER_ONE;
+        enemy = CHECKERS_PLAYER_TWO;
+        nextStateWin = CSTATE_END_P1_WIN;
+        nextStatePlayer = CSTATE_P2_TURN;
     } else if (game->state == CSTATE_P2_TURN) {
-        int status = boardTryMoveOrCapture(&game->checkersBoard, CHECKERS_PLAYER_TWO, from, to);
-        if (status == CHECKERS_CAPTURE_SUCCESS) {
-            if (boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_ONE) == 0) {
-                game->state = CSTATE_END_P2_WIN;
-                game->flags.run = 0;
-                game->turnsTotal += 1;
-            } else if (game->flags.forceCapture && checkIfPlayerShouldCapture(game, checkersGetCurrentPlayer(game), to)) {
-                game->turnsTotal += 1;
-            } else {
-                game->turnsTotal += 1;
-                game->state = CSTATE_P1_TURN;
-            }
-        } else if (status == CHECKERS_MOVE_SUCCESS) {
-            game->turnsTotal += 1;
-            game->state = CSTATE_P1_TURN;
-        }
-        return status;
+        player = CHECKERS_PLAYER_TWO;
+        enemy = CHECKERS_PLAYER_ONE;
+        nextStateWin = CSTATE_END_P2_WIN;
+        nextStatePlayer = CSTATE_P1_TURN;
     } else {
         return 0;
     }
+
+    int status = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
+    if (status == CHECKERS_CAPTURE_SUCCESS) {
+        if (boardRemainingPiecesPlayer(&game->checkersBoard, enemy) == 0) {
+            game->state = nextStateWin;
+            game->flags.run = 0;
+            game->turnsTotal += 1;
+        } else if (game->flags.forceCapture && checkIfPlayerShouldCapture(game, player, to)) {
+            game->turnsTotal += 1;
+        } else {
+            game->turnsTotal += 1;
+            game->state = nextStatePlayer;
+        }
+    } else if (status == CHECKERS_MOVE_SUCCESS) {
+        game->turnsTotal += 1;
+        game->state = nextStatePlayer;
+    }
+    return status;
 }
 
 int checkersGetCurrentPlayer(struct Checkers* game) {
@@ -265,27 +252,28 @@ int checkersPlayerShallCapture(struct Checkers* game) {
     }
     int player = checkersGetCurrentPlayer(game);
     int should = 0;
-    for (unsigned int y = 0; y < game->checkersBoard.boardSize; y++) {
-        for (unsigned int x = 0; x < game->checkersBoard.boardSize; x++) {
-            if (checkIfPlayerShouldCapture(game, player, (struct Point){ .x = x, .y = y })) {
-                should = 1;
-                break;
-            }
-        }
-        if (should) {
-            break;
+    for (unsigned int y = 0; y < game->checkersBoard.boardSize && !should; y++) {
+        for (unsigned int x = 0; x < game->checkersBoard.boardSize && !should; x++) {
+            should = checkIfPlayerShouldCapture(game, player, (struct Point){ .x = x, .y = y });
         }
     }
     return should;
 }
 
 void checkersPrint(struct Checkers* game) {
-    printf("Light pieces: %d\n", game->checkersBoard.remainingLightPieces);
-    printf("Dark pieces: %d\n", game->checkersBoard.remainingDarkPieces);
+    printf(BWHT "Light pieces:" CRESET " %d\n", game->checkersBoard.remainingLightPieces);
+    printf(BLK "Dark pieces:" CRESET " %d\n", game->checkersBoard.remainingDarkPieces);
     for (int y = 0; y < CHECKERS_BOARD_SIZE; y++) {
         printf("%d  ", CHECKERS_BOARD_SIZE - 1 - y);
         for (int x = 0; x < CHECKERS_BOARD_SIZE; x++) {
-            printf("%c ", game->checkersBoard.board[y][x]);
+            char ch = game->checkersBoard.board[y][x];
+            if (ch == game->checkersBoard.pieceLightMan || ch == game->checkersBoard.pieceLightKing) {
+                printf(BWHT "%c" CRESET " ", ch);
+            } else if (ch == game->checkersBoard.pieceDarkMan || ch == game->checkersBoard.pieceDarkKing) {
+                printf(BLK "%c" CRESET " ", ch);
+            } else {
+                printf("%c ", ch);
+            }
         }
         printf("\n");
     }
@@ -293,9 +281,17 @@ void checkersPrint(struct Checkers* game) {
     for (int i = 0; i < CHECKERS_BOARD_SIZE; i++) {
         printf("%c ", 'A' + i);
     }
-    printf("\n");
-}
+    
+    char* color = "";
+    int player = checkersGetCurrentPlayer(game);
+    if (player == CHECKERS_PLAYER_ONE) {
+        color = BWHT;
+    } else if (player == CHECKERS_PLAYER_TWO) {
+        color = BLK;
+    }
 
+    printf("\t%sTurn: %d%s\n", color, game->turnsTotal, CRESET);
+}
 
 // ----
 

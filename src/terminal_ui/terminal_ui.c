@@ -15,19 +15,19 @@ static int validateInput(char* input);
 */
 static struct Point getPositionFromStr(char* pos);
 
-void terminalGameBegin(void) {
-    terminalGameBeginF(stdin);
+void terminalCheckersBegin(struct Checkers* game) {
+    terminalCheckersBeginF(game, stdin);
 }
 
-void terminalGameBeginF(FILE* stepsfile) {
-    struct Checkers game;
-    checkersInit(&game, 1);
-    int quit = 0;
-
-    while (game.flags.run) {
-        checkersPrint(&game);
-        int currPlayer = checkersGetCurrentPlayer(&game);
-        printf("Current player: %d\n", currPlayer);
+void terminalCheckersBeginF(struct Checkers* game, FILE* stepsfile) {
+    while (game->flags.run) {
+        checkersPrint(game);
+        int currPlayer = checkersGetCurrentPlayer(game);
+        if (currPlayer == CHECKERS_PLAYER_ONE) {
+            printf("Current player: Player one, light pieces (%c and %c)\n", game->checkersBoard.pieceLightMan, game->checkersBoard.pieceLightKing);
+        } else {
+            printf("Current player: Player two, dark pieces (%c and %c)\n", game->checkersBoard.pieceDarkMan, game->checkersBoard.pieceDarkKing);
+        }
         size_t linesize = 0;
         char* move = NULL;
         int valid = 0;
@@ -35,9 +35,8 @@ void terminalGameBeginF(FILE* stepsfile) {
         while (!valid) {
             move = getline(stepsfile, &linesize);
             if (strcmp("exit", move) == 0) {
-                quit = 1;
                 free(move);
-                break;
+                return;
             }
             if (!validateInput(move)) {
                 printf("Invalid indices\n");
@@ -47,27 +46,24 @@ void terminalGameBeginF(FILE* stepsfile) {
             }
         }
 
-        if (quit) {
-            break;
-        }
-
         char* mov1 = strtok(move, " ");
         char* mov2 = strtok(NULL, " ");
         struct Point orig = getPositionFromStr(mov1);
         struct Point dest = getPositionFromStr(mov2);
         free(move);
 
-        if (checkersPlayerShallCapture(&game)) {
-            struct Checkers future = game;
+        if (checkersPlayerShallCapture(game)) {
+            struct Checkers future = *game;
             int status = checkersMakeMove(&future, orig, dest);
             if (status != CHECKERS_CAPTURE_SUCCESS) {
                 printf("Player shall capture!!\n");
                 printf("Capture failed!\n\n");
             } else {
-                game = future;
+                *game = future;
+                printf("successful capture!\n\n");
             }
         } else {
-            int status = checkersMakeMove(&game, orig, dest);
+            int status = checkersMakeMove(game, orig, dest);
             switch (status) {
                 case CHECKERS_CAPTURE_SUCCESS: printf("successful capture!\n\n"); break;
                 case CHECKERS_MOVE_SUCCESS:    printf("successful move!\n\n"); break;
@@ -83,6 +79,18 @@ void terminalGameBeginF(FILE* stepsfile) {
                     printf("unknown status\n\n");
             }
         }
+    }
+
+    checkersPrint(game);
+
+    if (game->state == CSTATE_END_P1_WIN) {
+        printf("Player one wins!! Turns: %d\n", game->turnsTotal);
+    } else if (game->state == CSTATE_END_P2_WIN) {
+        printf("Player two wins!! Turns: %d\n", game->turnsTotal);
+    } else if (game->state == CSTATE_END_DRAW) {
+        printf("Draw!! Turns: %d\n", game->turnsTotal);
+    } else {
+        printf("Something went wrong...\n");
     }
 }
 
