@@ -56,13 +56,13 @@ void terminalGameBeginF(FILE* stepsfile) {
         struct Point orig = getPositionFromStr(mov1);
         struct Point dest = getPositionFromStr(mov2);
         free(move);
-        
+
         if (checkersPlayerShallCapture(&game)) {
-            printf("Player shall capture!!\n");
             struct Checkers future = game;
             int status = checkersMakeMove(&future, orig, dest);
             if (status != CHECKERS_CAPTURE_SUCCESS) {
-                printf("Capture failed!\n");
+                printf("Player shall capture!!\n");
+                printf("Capture failed!\n\n");
             } else {
                 game = future;
             }

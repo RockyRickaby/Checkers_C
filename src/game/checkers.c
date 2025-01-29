@@ -187,6 +187,7 @@ int checkersInit(struct Checkers* game, int forceCapture) {
     return 1;
 }
 
+// TODO - Handle CSTATE_END_DRAW
 int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to) {
     if (!game || !game->flags.run) {
         return 0;
@@ -197,6 +198,8 @@ int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to) 
             if (boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_TWO) == 0) {
                 game->state = CSTATE_END_P1_WIN;
                 game->flags.run = 0;
+                game->turnsTotal += 1;
+            } else if (game->flags.forceCapture && checkIfPlayerShouldCapture(game, checkersGetCurrentPlayer(game), to)) {
                 game->turnsTotal += 1;
             } else {
                 game->turnsTotal += 1;
@@ -213,6 +216,8 @@ int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to) 
             if (boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_ONE) == 0) {
                 game->state = CSTATE_END_P2_WIN;
                 game->flags.run = 0;
+                game->turnsTotal += 1;
+            } else if (game->flags.forceCapture && checkIfPlayerShouldCapture(game, checkersGetCurrentPlayer(game), to)) {
                 game->turnsTotal += 1;
             } else {
                 game->turnsTotal += 1;
