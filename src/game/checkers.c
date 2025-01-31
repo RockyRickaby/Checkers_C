@@ -207,15 +207,18 @@ int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to) 
             game->state = nextStateWin;
             game->flags.run = 0;
             game->turnsTotal += 1;
+            boardTryTurnKing(&game->checkersBoard, to);
         } else if (game->flags.forceCapture && checkIfPlayerShouldCapture(game, player, to)) {
             game->turnsTotal += 1;
         } else {
             game->turnsTotal += 1;
             game->state = nextStatePlayer;
+            boardTryTurnKing(&game->checkersBoard, to);
         }
     } else if (status == CHECKERS_MOVE_SUCCESS) {
         game->turnsTotal += 1;
         game->state = nextStatePlayer;
+        boardTryTurnKing(&game->checkersBoard, to);
     }
     return status;
 }
