@@ -10,7 +10,7 @@ static char* getline(FILE* file, size_t* out_size);
 static int validateInput(char* input);
 
 /** 
- * (a-h)(1-10) || (0-9)(0-9)
+ * (a-j)(0-9) || (0-9)(0-9)
  * Ex.: a6, 34
 */
 static struct Point getPositionFromStr(char* pos);
