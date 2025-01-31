@@ -1,5 +1,5 @@
 #
-# 'make'        build executable file 'main'
+# 'make'        build executable file 'checkers'
 # 'make clean'  removes all .o and executable files
 #
 
@@ -7,12 +7,12 @@
 CC = gcc
 
 # define any compile-time flags
-CFLAGS	:= -Wall -Wextra -g
+CFLAGS	:= -Wall -Wextra -O3 -Wno-missing-braces
 
 # define library paths in addition to /usr/lib
 #   if I wanted to include libraries not in /usr/lib I'd specify
 #   their path using -Lpath, something like:
-LFLAGS =
+LFLAGS := 
 
 # define output directory
 OUTPUT	:= output
@@ -26,10 +26,11 @@ INCLUDE	:= include
 # define lib directory
 LIB		:= lib
 
-USEDLIBS := -lm
-
 ifeq ($(OS),Windows_NT)
-MAIN	:= main.exe
+MAIN	:= checkers.exe
+LFLAGS := $(LFLAGS) -LC:\raylib\raylib\src
+INCLUDE	:= $(INCLUDE) C:\raylib\raylib\src
+USEDLIBS := -lm -lraylib -lopengl32 -lgdi32 -lwinmm # -mwindows 
 SOURCEDIRS	:= $(SRC)
 INCLUDEDIRS	:= $(INCLUDE)
 LIBDIRS		:= $(LIB)
@@ -37,7 +38,8 @@ FIXPATH = $(subst /,\,$1)
 RM			:= rm -f
 MD	:= mkdir
 else
-MAIN	:= main
+MAIN	:= checkers
+USEDLIBS := -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 
 SOURCEDIRS	:= $(shell find $(SRC) -type d)
 INCLUDEDIRS	:= $(shell find $(INCLUDE) -type d)
 LIBDIRS		:= $(shell find $(LIB) -type d)
