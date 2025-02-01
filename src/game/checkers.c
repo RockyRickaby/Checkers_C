@@ -432,7 +432,6 @@ int checkersPlayerShallCapture(struct Checkers* game) {
 }
 
 struct Moves* checkersGetAvailableMovesForPlayer(struct Checkers* game, size_t* out_size) {
-    // TODO - finish this
     if (!out_size) {
         return NULL;
     }
@@ -673,7 +672,39 @@ static int checkIfPlayerShouldCapture(struct Checkers* game, int player, struct 
     }
 
     if (playerPiece == playerKing) {
-        return 0; // TODO - check if kings should capture as well
+        int index = 0;
+        struct Point moveVecs[4] = {
+            { .x = -1, .y = -1 },
+            { .x = -1, .y = 1 },
+            { .x = 1, .y = -1 },
+            { .x = 1, .y = 1 }
+        };
+        struct Point positions[4] = {
+            {pos.x + moveVecs[0].x, .y = pos.y + moveVecs[0].y},
+            {pos.x + moveVecs[1].x, .y = pos.y + moveVecs[1].y},
+            {pos.x + moveVecs[2].x, .y = pos.y + moveVecs[2].y},
+            {pos.x + moveVecs[3].x, .y = pos.y + moveVecs[3].y}
+        };
+        while (index < 4) {
+            while (1) {
+                if (!validIndex(positions[index].x, positions[index].y)) {
+                    break;
+                }
+                if (game->checkersBoard.board[positions[index].y][positions[index].x] == enemyMan || game->checkersBoard.board[positions[index].y][positions[index].x] == enemyKing) {
+                    if (canCapture(&game->checkersBoard, enemyMan, enemyKing, positions[index], moveVecs[index])) {
+                        return 1;
+                    } else {
+                        break;
+                    }
+                } else if (game->checkersBoard.board[positions[index].y][positions[index].x] != game->checkersBoard.blank) {
+                    break;
+                }
+                positions[index].x += moveVecs[index].x;
+                positions[index].y += moveVecs[index].y;
+            }
+            index++;
+        }
+        return 0;
     } else if (playerPiece == playerMan) {
         char p[4] = {
             validIndex(pos.x - 1, pos.y - 1) ? game->checkersBoard.board[pos.y - 1][pos.x - 1] : game->checkersBoard.blank,
