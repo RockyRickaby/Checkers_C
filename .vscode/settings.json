@@ -3,6 +3,13 @@
         "stdio.h": "c",
         "checkers_board.h": "c",
         "terminal_ui.h": "c",
-        "checkers.h": "c"
+        "checkers.h": "c",
+        "math.h": "c",
+        "string.h": "c",
+        "raymath.h": "c",
+        "raylib.h": "c",
+        "gui.h": "c",
+        "miniaudio.h": "c",
+        "stdlib.h": "c"
     }
 }
