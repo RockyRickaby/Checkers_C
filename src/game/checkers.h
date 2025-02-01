@@ -14,20 +14,24 @@
 #define CHECKERS_INVALID_MOVE       -3
 #define CHECKERS_INVALID_PLAYER     -4
 #define CHECKERS_NOT_A_PIECE        -5
-// #define CHECKERS_NULL_MOVES_LIST    -6
-// #define CHECKERS_EMPTY_MOVES_LIST   -7
-// #define CHECKERS_INVALID_MOVES_LIST -8
 
 #include <stddef.h>
+#include <stdint.h>
 
 struct Point {
     int x, y;
 };
 
+struct Moves {
+    struct Point from;
+    struct Point* to;
+    size_t to_size;
+};
+
 struct Board {
-    unsigned int boardSize;
-    unsigned int remainingLightPieces;
-    unsigned int remainingDarkPieces;
+    uint8_t boardSize;
+    uint8_t remainingLightPieces;
+    uint8_t remainingDarkPieces;
     char pieceLightMan;
     char pieceLightKing;
     char pieceDarkMan;
@@ -48,6 +52,7 @@ struct Checkers {
     struct {
         int forceCapture : 1;
         int run : 1;
+        int aiEnabled : 1;
     } flags;
     int turnsTotal;
     enum GameState state;
@@ -60,16 +65,19 @@ int boardTryMoveOrCapture(struct Board* gameboard, int player, struct Point piec
 void boardTryTurnKing(struct Board* gameboard, struct Point piecePos);
 int boardRemainingPiecesTotal(struct Board* gameboard);
 int boardRemainingPiecesPlayer(struct Board* gameboard, int player);
+int boardGetAvailableMovesForPiece(struct Board* gameboard, struct Point piecePos, struct Point** out, int includeBackwardsCaptures);
 void boardPrint(struct Board* gameboard);
 
 // ---
 
-int checkersInit(struct Checkers* game, int forceCapture);
+int checkersInit(struct Checkers* game, int forceCapture, int enableAi);
 int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to);
 int checkersGetCurrentPlayer(struct Checkers* game);
 int checkersGetWinner(struct Checkers* game);
 // int checkersGetClosestEnemies(struct Checkers* game, struct Point playerPos, struct Point* enemiesPos); /* receives output buffer and returns size */
 int checkersPlayerShallCapture(struct Checkers* game);
+struct Moves* checkersGetAvailableMovesForPlayer(struct Checkers* game, size_t* out_size);
+void checkersDestroyMovesList(struct Moves* moves, size_t moves_size);
 void checkersPrint(struct Checkers* game);
 
 #endif /* CHECKERS_BOARD_H */

@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "checkers.h"
 
@@ -137,6 +138,170 @@ int boardRemainingPiecesPlayer(struct Board* gameboard, int player) {
     }
 }
 
+static inline int canCapture(struct Board* gameboard, char enemy, char enemyKing, struct Point enemyPos, struct Point moveVec) {
+    return (
+        (gameboard->board[enemyPos.y][enemyPos.x] == enemy || gameboard->board[enemyPos.y][enemyPos.x] == enemyKing) &&
+        validIndex(enemyPos.x + moveVec.x, enemyPos.y + moveVec.y) &&
+        gameboard->board[enemyPos.y + moveVec.y][enemyPos.x + moveVec.x] == gameboard->blank
+    );
+}
+
+int boardGetAvailableMovesForPiece(struct Board* gameboard, struct Point piecePos, struct Point** out, int includeBackwardsCaptures) {
+    if (!gameboard || !out) {
+        return CHECKERS_NULL_BOARD;
+    }
+    if (!validIndex(piecePos.x, piecePos.y)) {
+        *out = NULL;
+        return CHECKERS_INVALID_MOVE;
+    }
+    if (gameboard->board[piecePos.y][piecePos.x] == gameboard->blank) {
+        *out = NULL;
+        return 0;
+    }
+    // finished!!
+    int illegalY;
+    int bufCap = 2;
+    if (includeBackwardsCaptures) {
+        bufCap = 4;
+    }
+    char enemy, enemyKing;
+    if (gameboard->board[piecePos.y][piecePos.x] == gameboard->pieceLightMan) {
+        enemy = gameboard->pieceDarkMan;
+        enemyKing = gameboard->pieceDarkKing;
+        illegalY = 1;
+    } else if (gameboard->board[piecePos.y][piecePos.x] == gameboard->pieceDarkMan) {
+        enemy = gameboard->pieceLightMan;
+        enemyKing = gameboard->pieceLightKing;
+        illegalY = -1;
+    } else {
+        if (gameboard->board[piecePos.y][piecePos.x] == gameboard->pieceLightKing) {
+            enemy = gameboard->pieceDarkMan;
+            enemyKing = gameboard->pieceDarkKing;
+        } else if (gameboard->board[piecePos.y][piecePos.x] == gameboard->pieceDarkKing) {
+            enemy = gameboard->pieceLightMan;
+            enemyKing = gameboard->pieceLightKing;
+        } else {
+            *out = NULL;
+            return 0;
+        }
+        illegalY = 0;
+        bufCap = 12;
+    }
+
+    int count = 0;
+    float resizeFact = 1.5f;
+    struct Point* buf = malloc(sizeof(struct Point) * bufCap);
+    if (buf == NULL) {
+        *out = NULL;
+        return 0;
+    }
+    if (gameboard->board[piecePos.y][piecePos.x] == gameboard->pieceLightMan || gameboard->board[piecePos.y][piecePos.x] == gameboard->pieceDarkMan) {
+        struct Point left = { .x = piecePos.x - 1, .y = piecePos.y + (illegalY * -1)};
+        struct Point right = { .x = piecePos.x + 1, .y = left.y};
+        if (validIndex(left.x, left.y)) {
+            if (canCapture(gameboard, enemy, enemyKing, left, (struct Point){ .x = -1, .y = illegalY * -1})) {
+                buf[count++] = (struct Point) {
+                    .x = left.x - 1,
+                    .y = left.y + (illegalY * -1)
+                };
+            } else if (gameboard->board[left.y][left.x] == gameboard->blank) {
+                buf[count++] = left;
+            }
+        }
+        if (validIndex(right.x, right.y)) {
+            if (canCapture(gameboard, enemy, enemyKing, right, (struct Point){ .x = 1, .y = illegalY * -1})) {
+                buf[count++] = (struct Point) {
+                    .x = right.x + 1,
+                    .y = right.y + (illegalY * -1)
+                };
+            } else if (gameboard->board[right.y][right.x] == gameboard->blank) {
+                buf[count++] = right;
+            }
+        }
+        if (includeBackwardsCaptures) {
+            struct Point left2 = { .x = piecePos.x - 1, .y = piecePos.y + illegalY};
+            struct Point right2 = { .x = piecePos.x + 1, .y = left2.y};
+            if (validIndex(left2.x, left2.y) && canCapture(gameboard, enemy, enemyKing, left2, (struct Point){ .x = -1, .y = illegalY})) {
+                buf[count++] = (struct Point) {
+                    .x = left2.x - 1,
+                    .y = left2.y + illegalY
+                };
+            }
+            if (validIndex(right2.x, right2.y) && canCapture(gameboard, enemy, enemyKing, right2, (struct Point){ .x = 1, .y = illegalY})) {
+                buf[count++] = (struct Point) {
+                    .x = right2.x + 1,
+                    .y = right2.y + illegalY
+                };
+            }
+        }
+    } else {
+        int index = 0;
+        struct Point moveVecs[4] = {
+            { .x = -1, .y = -1 },
+            { .x = -1, .y = 1 },
+            { .x = 1, .y = -1 },
+            { .x = 1, .y = 1 }
+        };
+        struct Point positions[4] = {
+            {piecePos.x + moveVecs[0].x, .y = piecePos.y + moveVecs[0].y},
+            {piecePos.x + moveVecs[1].x, .y = piecePos.y + moveVecs[1].y},
+            {piecePos.x + moveVecs[2].x, .y = piecePos.y + moveVecs[2].y},
+            {piecePos.x + moveVecs[3].x, .y = piecePos.y + moveVecs[3].y}
+        };
+        int hasCaptured[4] = {0, 0, 0, 0};
+
+        while (index < 4) {
+            while (1) {
+                if (!validIndex(positions[index].x, positions[index].y)) {
+                    break;
+                }
+                if (canCapture(gameboard, enemy, enemyKing, positions[index], moveVecs[index])) {
+                    if (hasCaptured[index]) {
+                        break;
+                    }
+                    hasCaptured[index] = 1;
+                    buf[count++] = (struct Point) {
+                        .x = positions[index].x + moveVecs[index].x,
+                        .y = positions[index].y + moveVecs[index].y
+                    };
+                    positions[index].x += 2 * moveVecs[index].x;
+                    positions[index].y += 2 * moveVecs[index].y;
+                } else if (gameboard->board[positions[index].y][positions[index].x] == gameboard->blank) {
+                    buf[count++] = positions[index];
+                    positions[index].x += moveVecs[index].x;
+                    positions[index].y += moveVecs[index].y;
+                } else {
+                    break;
+                }
+                if (count >= bufCap) {
+                    bufCap *= resizeFact;
+                    struct Point* tmp = realloc(buf, sizeof(struct Point) * bufCap);
+                    if (tmp == NULL) {
+                        free(buf);
+                        *out = NULL;
+                        return 0;
+                    }
+                    buf = tmp;
+                }
+            }
+            index++;
+        }
+    }
+    if (count == 0) {
+        *out = NULL;
+        free(buf);
+    } else {
+        struct Point* tmp = realloc(buf, sizeof(struct Point) * count);
+        if (tmp == NULL) {
+            free(buf);
+            *out = NULL;
+            return 0;
+        }
+        *out = tmp;
+    }
+    return count;
+}
+
 void boardPrint(struct Board* gameboard) {
     if (gameboard) {
         printf(
@@ -167,12 +332,13 @@ void boardPrint(struct Board* gameboard) {
  * 
  */
 
-int checkersInit(struct Checkers* game, int forceCapture) {
+int checkersInit(struct Checkers* game, int forceCapture, int enableAi) {
     if (!game) {
         return 0;
     }
     game->flags.forceCapture = forceCapture > 0;
     game->flags.run = 1;
+    game->flags.aiEnabled = enableAi > 0;
     game->state = CSTATE_P1_TURN;
     game->turnsTotal = 0;
     boardInit(&game->checkersBoard);
@@ -197,6 +363,8 @@ int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to) 
         enemy = CHECKERS_PLAYER_ONE;
         nextStateWin = CSTATE_END_P2_WIN;
         nextStatePlayer = CSTATE_P1_TURN;
+
+        // handle ai here?
     } else {
         return 0;
     }
@@ -263,6 +431,77 @@ int checkersPlayerShallCapture(struct Checkers* game) {
     return should;
 }
 
+struct Moves* checkersGetAvailableMovesForPlayer(struct Checkers* game, size_t* out_size) {
+    // TODO - finish this
+    if (!out_size) {
+        return NULL;
+    }
+    if (!game || !game->flags.run) {
+        *out_size = 0;
+        return NULL;
+    }
+    char piece, king;
+    if (game->state == CSTATE_P1_TURN) {
+        piece = game->checkersBoard.pieceLightMan;
+        king = game->checkersBoard.pieceLightKing;
+    } else if (game->state == CSTATE_P2_TURN) {
+        piece = game->checkersBoard.pieceDarkMan;
+        king = game->checkersBoard.pieceDarkKing;
+    } else {
+        *out_size = 0;
+        return NULL;
+    }
+
+    size_t cap = 10;
+    size_t size = 0;
+    struct Moves* list = malloc(sizeof(struct Moves) * cap);
+    if (!list) {
+        *out_size = 0;
+        return NULL;
+    }
+    for (int y = 0; y < game->checkersBoard.boardSize; y++) {
+        for (int x = 0; x < game->checkersBoard.boardSize; x++) {
+            if (game->checkersBoard.board[y][x] == piece || game->checkersBoard.board[y][x] == king) {
+                struct Moves mov = {0};
+                mov.from = (struct Point){ .x = x, .y = y };
+                int count = boardGetAvailableMovesForPiece(&game->checkersBoard, mov.from, &mov.to, game->flags.forceCapture);
+                if (count > 0 && mov.to != NULL) {
+                    mov.to_size = count;
+                    list[size++] = mov;
+                }
+                if (size >= cap) {
+                    cap *= 1.5f;
+                    struct Moves* tmp = realloc(list, sizeof(struct Moves) * cap);
+                    if (!tmp) {
+                        free(list);
+                        *out_size = 0;
+                        return NULL;
+                    }
+                    list = tmp;
+                }
+            }
+        }
+    }
+    struct Moves* tmp = realloc(list, sizeof(struct Moves) * size);
+    if (!tmp) {
+        free(list);
+        *out_size = 0;
+        return NULL;
+    }
+    list = tmp;
+    *out_size = size;
+    return list;
+}
+
+void checkersDestroyMovesList(struct Moves* moves, size_t moves_size) {
+    if (moves) {
+        for (size_t i = 0; i < moves_size; i++) {
+            free(moves[i].to);
+        }
+        free(moves);
+    }
+}
+
 void checkersPrint(struct Checkers* game) {
     printf(BWHT "Light pieces:" CRESET " %d\n", game->checkersBoard.remainingLightPieces);
     printf(BLK "Dark pieces:" CRESET " %d\n", game->checkersBoard.remainingDarkPieces);
@@ -305,7 +544,7 @@ static int movePiece(struct Board* gameboard, int player, struct Point piecePos,
     char playerMan = 0, playerKing = 0;
     char enemyMan = 0, enemyKing = 0;
 
-    int prohibitedY = 0;
+    int illegalY = 0;
     if (player == CHECKERS_PLAYER_ONE) {
         playerMan = gameboard->pieceLightMan;
         playerKing = gameboard->pieceLightKing;
@@ -313,14 +552,14 @@ static int movePiece(struct Board* gameboard, int player, struct Point piecePos,
         enemyMan = gameboard->pieceDarkMan;
         enemyKing = gameboard->pieceDarkKing;
 
-        prohibitedY = 1;
+        illegalY = 1;
     } else if (player == CHECKERS_PLAYER_TWO) {
         playerMan = gameboard->pieceDarkMan;
         playerKing = gameboard->pieceDarkKing;
 
         enemyMan = gameboard->pieceLightMan;
         enemyKing = gameboard->pieceLightKing;
-        prohibitedY = -1;
+        illegalY = -1;
     } else {
         return CHECKERS_INVALID_PLAYER;
     }
@@ -398,7 +637,7 @@ static int movePiece(struct Board* gameboard, int player, struct Point piecePos,
             return CHECKERS_INVALID_MOVE;
         }
 
-        if (capturePiece != gameboard->blank || moveVec.y == prohibitedY) {
+        if (capturePiece != gameboard->blank || moveVec.y == illegalY) {
             return CHECKERS_MOVE_FAIL;   
         }
 
