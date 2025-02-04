@@ -50,9 +50,9 @@ enum GameState {
 
 struct Checkers {
     struct {
-        int forceCapture : 1;
-        int run : 1;
-        int aiEnabled : 1;
+        int forceCapture;
+        int run;
+        int aiEnabled;
     } flags;
     int turnsTotal;
     enum GameState state;
@@ -61,11 +61,13 @@ struct Checkers {
 
 int boardInit(struct Board* gameboard);
 int boardTryMoveOrCapture(struct Board* gameboard, int player, struct Point piecePos, struct Point newPos);
-// int boardMultiMoveCapture(struct Board* gameboard, int player, struct Point piecePos, struct Point* movesList, size_t listSize);
 void boardTryTurnKing(struct Board* gameboard, struct Point piecePos);
 int boardRemainingPiecesTotal(struct Board* gameboard);
 int boardRemainingPiecesPlayer(struct Board* gameboard, int player);
 int boardGetAvailableMovesForPiece(struct Board* gameboard, struct Point piecePos, struct Point** out, int includeBackwardsCaptures);
+struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int player, int forceCapture, size_t* out_size);
+int boardCheckIfPieceCanCapture(struct Board* gameboard, int player, struct Point pos);
+int boardCheckIfPlayerCanCapture(struct Board* gameboard, int player);
 void boardPrint(struct Board* gameboard);
 
 // ---
