@@ -9,7 +9,7 @@
 
 int main(int argc, char const *argv[]) {
     struct Checkers game;
-    checkersInit(&game, 1);
+    checkersInit(&game, 1, 1);
     // terminalCheckersBeginF(&game, stdin);
     guiGameBegin(&game);
     // if (argc == 2 && strcmp(argv[1], "help") == 0) {
