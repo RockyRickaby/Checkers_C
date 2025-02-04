@@ -10,6 +10,17 @@
         "raylib.h": "c",
         "gui.h": "c",
         "miniaudio.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "pthread.h": "c",
+        "windows.h": "c",
+        "_mingw.h": "c",
+        "text_encoding": "c",
+        "process.h": "c",
+        "stdint.h": "c",
+        "crtdefs.h": "c",
+        "synchapi.h": "c",
+        "cstdlib": "c",
+        "limits.h": "c",
+        "float.h": "c"
     }
 }

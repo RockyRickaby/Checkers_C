@@ -6,14 +6,14 @@
             "type": "cppdbg",
             "request": "launch",
             "args": [],
-            "stopAtEntry": false,
+            "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
             "linux": {
                 "MIMode": "gdb",
                 "miDebuggerPath": "gdb",
-                "program": "${workspaceFolder}/output/main"
+                "program": "${workspaceFolder}/output/Checkers"
             },
             "osx": {
                 "MIMode": "lldb",
@@ -23,9 +23,9 @@
             "windows": {
                 "MIMode": "gdb",
                 "miDebuggerPath": "gdb.exe",
-                "program": "${workspaceFolder}/output/main.exe"
+                "program": "${workspaceFolder}/output/CheckersWin.exe"
             },
-            "preLaunchTask": "build"
+            "preLaunchTask": "build",
         }
     ]
 }
