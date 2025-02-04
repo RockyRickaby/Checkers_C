@@ -27,10 +27,10 @@ INCLUDE	:= include
 LIB		:= lib
 
 ifeq ($(OS),Windows_NT)
-MAIN	:= checkers.exe
+MAIN	:= CheckersWin.exe
 LFLAGS := $(LFLAGS) -LC:\raylib\raylib\src
 INCLUDE	:= $(INCLUDE) C:\raylib\raylib\src
-USEDLIBS := -lm -lraylib -lopengl32 -lgdi32 -lwinmm # -mwindows 
+USEDLIBS := -lm -lraylib -lopengl32 -lgdi32 -lwinmm # -lKernel32 -mwindows 
 SOURCEDIRS	:= $(SRC)
 INCLUDEDIRS	:= $(INCLUDE)
 LIBDIRS		:= $(LIB)
@@ -38,7 +38,7 @@ FIXPATH = $(subst /,\,$1)
 RM			:= rm -f
 MD	:= mkdir
 else
-MAIN	:= checkers
+MAIN	:= CheckersLinux
 USEDLIBS := -lraylib -lGL -lm -lpthread -ldl -lrt -lX11 
 SOURCEDIRS	:= $(shell find $(SRC) -type d)
 INCLUDEDIRS	:= $(shell find $(INCLUDE) -type d)
