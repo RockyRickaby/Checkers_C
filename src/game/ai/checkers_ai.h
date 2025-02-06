@@ -1,6 +1,8 @@
 #ifndef CHECKERS_AI_H
 #define CHECKERS_AI_H
 
+#define AI_DEPTH 5
+
 #include "../checkers.h"
 
 struct AiMoves {

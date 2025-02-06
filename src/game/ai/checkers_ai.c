@@ -1,12 +1,11 @@
 #include "checkers_ai.h"
 #include "../checkers.h"
+#include "external/rprand.h"
 
-#include <stdlib.h>
 #include <stdint.h>
 #include <math.h>
-#include <float.h>
-#include <stdio.h>
-#include <assert.h>
+#include <limits.h>
+#include <time.h>
 
 #define false   0
 #define true    1
@@ -131,19 +130,31 @@ struct MinimaxRet {
     double heuristicEval;
 };
 
-static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int maximize, struct AiMoves* out);
+static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int maximize);
 static double heuristics(struct Board* gameboard);
+
+static void shuffle(struct Moves* array, size_t n) {
+    rprand_set_seed(time(NULL));
+    if (n > 1) {
+        for (size_t i = 0; i < n - 1; i++) {
+            int r = rprand_get_value(0, n - 1);
+            struct Moves tmp = array[r];
+            array[r] = array[i];
+            array[i] = tmp;
+        }
+    }
+}   
 
 static struct AiMoves minimax(struct Ai* ai) {
     if (!ai->checkers->flags.run || ai->checkers->state != CSTATE_P2_TURN) {
         return invalidMove;
     }
     struct AiMoves res = invalidMove;
-    struct AiMoves dum;
     size_t mSize;
     struct Moves* movesList = boardGetAvailableMovesForPlayer(&ai->checkers->checkersBoard, CHECKERS_PLAYER_TWO, ai->checkers->flags.forceCapture, &mSize);
-
-    struct Moves moveRes;
+    if (mSize > 0) {
+        shuffle(movesList, mSize); 
+    }
     double heuristic = LONG_MIN;
     if (ai->checkers->flags.forceCapture && boardCheckIfPlayerCanCapture(&ai->checkers->checkersBoard, CHECKERS_PLAYER_TWO)) {
         for (size_t i = 0; i < mSize; i++) {
@@ -158,11 +169,10 @@ static struct AiMoves minimax(struct Ai* ai) {
                 if (status != CHECKERS_CAPTURE_SUCCESS) {
                     continue;
                 }
-                double tmp = minimaxr(&future, ai->checkers->flags.forceCapture, 6, false, &dum);
+                double tmp = minimaxr(&future, ai->checkers->flags.forceCapture, AI_DEPTH, false);
                 if (tmp > heuristic) {
                     heuristic = tmp;
-                    moveRes = movesList[i];
-                    res = (struct AiMoves){ .valid = 1, .from = moveRes.from, .to = moveRes.to[j] };
+                    res = (struct AiMoves){ .valid = 1, .from = movesList[i].from, .to = movesList[i].to[j] };
                 }
             }
         }
@@ -176,25 +186,23 @@ static struct AiMoves minimax(struct Ai* ai) {
                 if (status != CHECKERS_MOVE_SUCCESS && status != CHECKERS_CAPTURE_SUCCESS) {
                     continue;   
                 }
-                double tmp = minimaxr(&future, ai->checkers->flags.forceCapture, 6, false, &dum);
+                double tmp = minimaxr(&future, ai->checkers->flags.forceCapture, AI_DEPTH, false);
                 if (tmp > heuristic) {
                     heuristic = tmp;
-                    moveRes = movesList[i];
-                    res = (struct AiMoves){ .valid = 1, .from = moveRes.from, .to = moveRes.to[j] };
+                    res = (struct AiMoves){ .valid = 1, .from = movesList[i].from, .to = movesList[i].to[j] };
                 }
             }
         }
     }
     checkersDestroyMovesList(movesList, mSize);
-    // minimaxr(&ai->checkers->checkersBoard, ai->checkers->flags.forceCapture, 5, true, &res);
     if (!res.valid) {
         return invalidMove;
     }
     return res;
 }
 
-static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int maximize, struct AiMoves* out) {
-    if (depth == 0) {
+static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int maximize) {
+    if (depth == 0 || gameboard->remainingDarkPieces == 0 || gameboard->remainingLightPieces == 0) {
         return heuristics(gameboard);
     }
     if (maximize) {
@@ -215,10 +223,9 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
                     if (status != CHECKERS_CAPTURE_SUCCESS) {
                         continue;
                     }
-                    double tmp = minimaxr(&future, forceCapture, depth - 1, false, out);
+                    double tmp = minimaxr(&future, forceCapture, depth - 1, false);
                     if (tmp > res) {
                         res = tmp;
-                        *out = (struct AiMoves){ .valid = 1, .from = from, .to = to };
                     }
                 }
             }
@@ -232,10 +239,9 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
                     if (status != CHECKERS_MOVE_SUCCESS && status != CHECKERS_CAPTURE_SUCCESS) {
                         continue;
                     }
-                    double tmp = minimaxr(&future, forceCapture, depth - 1, false, out);
+                    double tmp = minimaxr(&future, forceCapture, depth - 1, false);
                     if (tmp > res) {
                         res = tmp;
-                        *out = (struct AiMoves){ .valid = 1, .from = from, .to = to };   
                     }
                 }
             }
@@ -260,12 +266,10 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
                     if (status != CHECKERS_CAPTURE_SUCCESS) {
                         continue;
                     }
-                    double tmp = minimaxr(&future, forceCapture, depth - 1, true, out);
+                    double tmp = minimaxr(&future, forceCapture, depth - 1, true);
                     if (tmp < res) {
                         res = tmp;
-                        *out = (struct AiMoves){ .valid = 1, .from = from, .to = to };
                     }
-                    // gameboard = past;
                 }
             }
         } else {
@@ -278,13 +282,10 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
                     if (status != CHECKERS_MOVE_SUCCESS && status != CHECKERS_CAPTURE_SUCCESS) {
                         continue;
                     }
-                    double tmp = minimaxr(&future, forceCapture, depth - 1, true, out);
+                    double tmp = minimaxr(&future, forceCapture, depth - 1, true);
                     if (tmp < res) {
                         res = tmp;
-                        *out = (struct AiMoves){ .valid = 1, .from = from, .to = to };   
                     }
-                    // gameboard = past;
-
                 }
             }
         }
@@ -331,7 +332,7 @@ static double heuristics(struct Board* gameboard) {
  * 
  * 
  * 
- * n o t h i n g
+ *
  * 
  * 
  * 
@@ -374,7 +375,7 @@ static inline int createMutex(struct Ai* ai) {
     ai->queue.mutex = CreateMutexA(NULL, FALSE, NULL);
     return ai->queue.mutex != NULL;
     #else
-    return pthread_mutex_init(&ai->queue.mutex) == 0;
+    return pthread_mutex_init(&ai->queue.mutex, NULL) == 0;
     #endif
 }
 

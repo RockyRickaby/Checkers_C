@@ -1,6 +1,5 @@
 #include <string.h>
 #include <stdio.h>
-#include <math.h>
 #include <stdlib.h>
 
 #include "checkers.h"
@@ -151,7 +150,7 @@ int boardGetAvailableMovesForPiece(struct Board* gameboard, struct Point piecePo
     }
 
     int count = 0;
-    float resizeFact = 1.5f;
+    double resizeFact = 1.5;
     struct Point* buf = malloc(sizeof(struct Point) * bufCap);
     if (buf == NULL) {
         *out = NULL;
@@ -279,6 +278,7 @@ struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int playe
 
     size_t cap = 10;
     size_t size = 0;
+    double resizeFact = 1.5;
     struct Moves* list = malloc(sizeof(struct Moves) * cap);
     if (!list) {
         *out_size = 0;
@@ -295,7 +295,7 @@ struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int playe
                     list[size++] = mov;
                 }
                 if (size >= cap) {
-                    cap *= 1.5f;
+                    cap *= resizeFact;
                     struct Moves* tmp = realloc(list, sizeof(struct Moves) * cap);
                     if (!tmp) {
                         free(list);
@@ -306,6 +306,11 @@ struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int playe
                 }
             }
         }
+    }
+    if (size == 0) {
+        *out_size = 0;
+        free(list);
+        return NULL;
     }
     struct Moves* tmp = realloc(list, sizeof(struct Moves) * size);
     if (!tmp) {

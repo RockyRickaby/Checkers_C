@@ -50,9 +50,9 @@ enum GameState {
 
 struct Checkers {
     struct {
-        int forceCapture;
-        int run;
-        int aiEnabled;
+        uint8_t forceCapture;
+        uint8_t run;
+        uint8_t aiEnabled;
     } flags;
     int turnsTotal;
     enum GameState state;
