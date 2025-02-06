@@ -3,9 +3,9 @@
 #include <string.h>
 #include <stddef.h>
 
-#include "game/checkers.h"
-#include "terminal_ui/terminal_ui.h"
-#include "gui/gui.h"
+#include "checkers.h"
+#include "terminal_ui.h"
+#include "gui.h"
 
 int main(int argc, char const *argv[]) {
     struct Checkers game;

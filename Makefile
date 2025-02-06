@@ -18,7 +18,7 @@ LFLAGS :=
 OUTPUT	:= output
 
 # define source directory
-SRC		:= src src/* src/*/*
+SRC		:= src
 
 # define include directory
 INCLUDE	:= include

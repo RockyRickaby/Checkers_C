@@ -1,7 +1,7 @@
 #ifndef TERMINAL_UI_H
 #define TERMINAL_UI_H
 
-#include "../game/checkers.h"
+#include "checkers.h"
 
 #include <stdio.h>
 

@@ -3,7 +3,7 @@
 
 #define AI_DEPTH 5
 
-#include "../checkers.h"
+#include "checkers.h"
 
 struct AiMoves {
     int valid;

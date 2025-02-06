@@ -1,5 +1,5 @@
 #include "checkers_ai.h"
-#include "../checkers.h"
+#include "checkers.h"
 #include "external/rprand.h"
 
 #include <stdint.h>

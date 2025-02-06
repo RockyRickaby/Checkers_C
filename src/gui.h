@@ -1,7 +1,7 @@
 #ifndef GUI_H
 #define GUI_H
 
-#include "../game/checkers.h"
+#include "checkers.h"
 
 #include <stdio.h>
 

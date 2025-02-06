@@ -21,6 +21,10 @@
         "synchapi.h": "c",
         "cstdlib": "c",
         "limits.h": "c",
-        "float.h": "c"
+        "float.h": "c",
+        "ctype.h": "c",
+        "random": "c",
+        "checkers_ai.h": "c",
+        "rprand.h": "c"
     }
 }

@@ -1,6 +1,6 @@
 #include "terminal_ui.h"
-#include "../game/checkers.h"
-#include "../game/ai/checkers_ai.h"
+#include "checkers.h"
+#include "checkers_ai.h"
 
 #include <stdio.h>
 #include <stdlib.h>

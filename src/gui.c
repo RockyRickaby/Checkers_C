@@ -1,8 +1,8 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "gui.h"
-#include "../game/checkers.h"
-#include "../game/ai/checkers_ai.h"
+#include "checkers.h"
+#include "checkers_ai.h"
 
 #include <stdio.h>
 #include <ctype.h>
