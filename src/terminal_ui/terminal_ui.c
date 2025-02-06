@@ -1,13 +1,15 @@
 #include "terminal_ui.h"
 #include "../game/checkers.h"
+#include "../game/ai/checkers_ai.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
-static char* getline(FILE* file, size_t* out_size);
-static int validateInput(char* input);
+static inline int validateInput(char* input);
+static char* readLine(FILE* file, size_t* out_size);
+static void handleMove(struct Checkers* game, struct Point orig, struct Point dest);
 
 /** 
  * (a-j)(0-9) || (0-9)(0-9)
@@ -20,6 +22,10 @@ void terminalCheckersBegin(struct Checkers* game) {
 }
 
 void terminalCheckersBeginF(struct Checkers* game, FILE* stepsfile) {
+    struct Ai* ai = NULL;
+    if (game->flags.aiEnabled) {
+        ai = checkersAiCreate(game);
+    }
     while (game->flags.run) {
         checkersPrint(game);
         int currPlayer = checkersGetCurrentPlayer(game);
@@ -27,13 +33,22 @@ void terminalCheckersBeginF(struct Checkers* game, FILE* stepsfile) {
             printf("Current player: Player one, light pieces (%c and %c)\n", game->checkersBoard.pieceLightMan, game->checkersBoard.pieceLightKing);
         } else {
             printf("Current player: Player two, dark pieces (%c and %c)\n", game->checkersBoard.pieceDarkMan, game->checkersBoard.pieceDarkKing);
+            if (game->flags.aiEnabled && ai) {
+                printf("Thinking...\n");
+                struct AiMoves moves = checkersAiGenMovesSync(ai);
+                if (!moves.valid) {
+                    break;
+                }
+                handleMove(game, moves.from, moves.to);
+                continue;
+            }
         }
         size_t linesize = 0;
         char* move = NULL;
         int valid = 0;
 
         while (!valid) {
-            move = getline(stepsfile, &linesize);
+            move = readLine(stepsfile, &linesize);
             if (strcmp("exit", move) == 0) {
                 free(move);
                 return;
@@ -52,33 +67,7 @@ void terminalCheckersBeginF(struct Checkers* game, FILE* stepsfile) {
         struct Point dest = getPositionFromStr(mov2);
         free(move);
 
-        if (checkersPlayerShallCapture(game)) {
-            struct Checkers future = *game;
-            int status = checkersMakeMove(&future, orig, dest);
-            if (status != CHECKERS_CAPTURE_SUCCESS) {
-                printf("Player shall capture!!\n");
-                printf("Capture failed!\n\n");
-            } else {
-                *game = future;
-                printf("successful capture!\n\n");
-            }
-        } else {
-            int status = checkersMakeMove(game, orig, dest);
-            switch (status) {
-                case CHECKERS_CAPTURE_SUCCESS: printf("successful capture!\n\n"); break;
-                case CHECKERS_MOVE_SUCCESS:    printf("successful move!\n\n"); break;
-                case CHECKERS_NULL_BOARD:      printf("invalid arg. null *board*\n\n"); break;
-                case CHECKERS_MOVE_FAIL:       printf("move attempt failed!\n\n"); break;
-                case CHECKERS_INVALID_MOVE:    printf("invalid move attempt\n\n"); break;
-                case CHECKERS_INVALID_PLAYER:  printf("not a player!\n\n"); break;
-                case CHECKERS_NOT_A_PIECE:     printf("index does not represent a current player's piece\n\n"); break;
-                // case CHECKERS_NULL_MOVES_LIST: break;
-                // case CHECKERS_EMPTY_MOVES_LIST: break;
-                // case CHECKERS_INVALID_MOVES_LIST: break;
-                default:
-                    printf("unknown status\n\n");
-            }
-        }
+        handleMove(game, orig, dest);
     }
 
     checkersPrint(game);
@@ -92,10 +81,42 @@ void terminalCheckersBeginF(struct Checkers* game, FILE* stepsfile) {
     } else {
         printf("Something went wrong...\n");
     }
+
+    checkersAiKill(ai);
+}
+
+static void handleMove(struct Checkers* game, struct Point orig, struct Point dest) {
+    if (checkersPlayerShallCapture(game)) {
+        struct Checkers future = *game;
+        int status = checkersMakeMove(&future, orig, dest);
+        if (status != CHECKERS_CAPTURE_SUCCESS) {
+            printf("Player shall capture!!\n");
+            printf("Capture failed!\n\n");
+        } else {
+            *game = future;
+            printf("successful capture!\n\n");
+        }
+    } else {
+        int status = checkersMakeMove(game, orig, dest);
+        switch (status) {
+            case CHECKERS_CAPTURE_SUCCESS: printf("successful capture!\n\n"); break;
+            case CHECKERS_MOVE_SUCCESS:    printf("successful move!\n\n"); break;
+            case CHECKERS_NULL_BOARD:      printf("invalid arg. null *board*\n\n"); break;
+            case CHECKERS_MOVE_FAIL:       printf("move attempt failed!\n\n"); break;
+            case CHECKERS_INVALID_MOVE:    printf("invalid move attempt\n\n"); break;
+            case CHECKERS_INVALID_PLAYER:  printf("not a player!\n\n"); break;
+            case CHECKERS_NOT_A_PIECE:     printf("index does not represent a current player's piece\n\n"); break;
+            // case CHECKERS_NULL_MOVES_LIST: break;
+            // case CHECKERS_EMPTY_MOVES_LIST: break;
+            // case CHECKERS_INVALID_MOVES_LIST: break;
+            default:
+                printf("unknown status\n\n");
+        }
+    }
 }
 
 /* format: oo dd, o -> origin, a1 or 11, d -> destination, a1 or 11 */
-static int validateInput(char* input) {
+static inline int validateInput(char* input) {
     return (
         strlen(input) == 5 &&
         input[2] == ' ' &&
@@ -123,7 +144,7 @@ static struct Point getPositionFromStr(char* pos) {
     };
 }
 
-static char* getline(FILE* file, size_t* out_size) {
+static char* readLine(FILE* file, size_t* out_size) {
     if (file == NULL || out_size == NULL) {
         return NULL;
     }

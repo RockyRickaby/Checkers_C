@@ -2,10 +2,9 @@
 #include "raymath.h"
 #include "gui.h"
 #include "../game/checkers.h"
+#include "../game/ai/checkers_ai.h"
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <ctype.h>
 
 #define MAX(a, b) ((a)>(b)? (a) : (b))
@@ -14,6 +13,12 @@
 static void handleMove(struct Checkers* game, struct Point move[2]);
 
 void guiGameBegin(struct Checkers* game) {
+    struct Ai* ai = NULL;
+    struct AiMoves aiMove;
+    int allowPlayerMove = 1;
+    if (game->flags.aiEnabled) {
+        ai = checkersAiCreate(game);
+    }
     Color playerTwoColor = (Color){.r = 105, .g = 71, .b =62, .a = 255};
     Color playerOneColor = GOLD;
 
@@ -52,10 +57,26 @@ void guiGameBegin(struct Checkers* game) {
                 }
                 break;
             case CSTATE_P2_TURN:    
-                if (checkersPlayerShallCapture(game)) {
-                    SetWindowTitle("International Checkers - Player two's turn, dark pieces. Must capture!!");
+                if (game->flags.aiEnabled && ai) {
+                    SetWindowTitle("International Checkers - Player two is thinking...");
+                    allowPlayerMove = 0;
+                    int ok = checkersAiGenMovesAsync(ai);
+                    if (!ok) {
+                        CloseWindow();
+                    }
+                    aiMove = checkersAiTryGetMoves(ai);
+                    if (aiMove.valid) {
+                        move[0] = aiMove.from;
+                        move[1] = aiMove.to;
+                        handleMove(game, move);
+                        allowPlayerMove = 1;
+                    }
                 } else {
-                    SetWindowTitle("International Checkers - Player two's turn, dark pieces");
+                    if (checkersPlayerShallCapture(game)) {
+                        SetWindowTitle("International Checkers - Player two's turn, dark pieces. Must capture!!");
+                    } else {
+                        SetWindowTitle("International Checkers - Player two's turn, dark pieces");
+                    }
                 }
                 break;
             case CSTATE_END_P1_WIN: 
@@ -80,7 +101,8 @@ void guiGameBegin(struct Checkers* game) {
 
         x = virtualMouse.x / boardQuadSize;
         y = virtualMouse.y / boardQuadSize;
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && allowPlayerMove) {
             if (moveIdx == 0) {
                 move[moveIdx] = (struct Point){.x = x, .y = y};
                 moveIdx += 1;
@@ -112,9 +134,9 @@ void guiGameBegin(struct Checkers* game) {
                     } else if (ch == game->checkersBoard.pieceDarkMan) {
                         DrawCircle(j * boardQuadSize + (boardQuadSize / 2), i * boardQuadSize + (boardQuadSize / 2), (float) (boardQuadSize * 0.85f) / 2, playerTwoColor);
                     } else if (ch == game->checkersBoard.pieceLightKing) {
-
+                        DrawCircle(j * boardQuadSize + (boardQuadSize / 2), i * boardQuadSize + (boardQuadSize / 2), (float) (boardQuadSize * 0.85f) / 2, Fade(playerOneColor, .5f));
                     } else if (ch == game->checkersBoard.pieceDarkKing) {
-
+                        DrawCircle(j * boardQuadSize + (boardQuadSize / 2), i * boardQuadSize + (boardQuadSize / 2), (float) (boardQuadSize * 0.85f) / 2, Fade(playerTwoColor, .5f));
                     }
                 }
             }
@@ -137,6 +159,10 @@ void guiGameBegin(struct Checkers* game) {
         EndDrawing();
     }
 
+    if (WindowShouldClose() && game->flags.aiEnabled && ai) {
+        SetWindowTitle("Just a second...");
+        checkersAiKill(ai);
+    }
     // TODO: Unload all loaded data (textures, fonts, audio) here!
     UnloadRenderTexture(gameScreen);
     CloseWindow();
@@ -146,28 +172,10 @@ static void handleMove(struct Checkers* game, struct Point move[2]) {
     if (checkersPlayerShallCapture(game)) {
         struct Checkers future = *game;
         int status = checkersMakeMove(&future, move[0], move[1]);
-        if (status != CHECKERS_CAPTURE_SUCCESS) {
-            printf("Player shall capture!!\n");
-            printf("Capture failed!\n");
-        } else {
+        if (status == CHECKERS_CAPTURE_SUCCESS) {
             *game = future;
-            printf("successful capture!\n");
         }
     } else {
         int status = checkersMakeMove(game, move[0], move[1]);
-        switch (status) {
-            case CHECKERS_CAPTURE_SUCCESS: printf("successful capture!\n"); break;
-            case CHECKERS_MOVE_SUCCESS:    printf("successful move!\n"); break;
-            case CHECKERS_NULL_BOARD:      printf("invalid arg. null *board*\n"); break;
-            case CHECKERS_MOVE_FAIL:       printf("move attempt failed!\n"); break;
-            case CHECKERS_INVALID_MOVE:    printf("invalid move attempt\n"); break;
-            case CHECKERS_INVALID_PLAYER:  printf("not a player!\n"); break;
-            case CHECKERS_NOT_A_PIECE:     printf("index does not represent a current player's piece\n"); break;
-            // case CHECKERS_NULL_MOVES_LIST: break;
-            // case CHECKERS_EMPTY_MOVES_LIST: break;
-            // case CHECKERS_INVALID_MOVES_LIST: break;
-            default:
-                printf("unknown status\n");
-        }
     }
 }
