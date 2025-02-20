@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "args": [],
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": false,
@@ -14,11 +14,6 @@
                 "MIMode": "gdb",
                 "miDebuggerPath": "gdb",
                 "program": "${workspaceFolder}/output/Checkers"
-            },
-            "osx": {
-                "MIMode": "lldb",
-                "miDebuggerPath": "lldb-mi",
-                "program": "${workspaceFolder}/output/main"
             },
             "windows": {
                 "MIMode": "gdb",

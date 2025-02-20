@@ -25,6 +25,8 @@
         "ctype.h": "c",
         "random": "c",
         "checkers_ai.h": "c",
-        "rprand.h": "c"
+        "rprand.h": "c",
+        "new_checkers.h": "c",
+        "*.m": "c"
     }
 }

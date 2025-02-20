@@ -1,7 +1,7 @@
 #ifndef CHECKERS_AI_H
 #define CHECKERS_AI_H
 
-#define AI_DEPTH 5
+#define AI_DEPTH 7
 
 #include "checkers.h"
 

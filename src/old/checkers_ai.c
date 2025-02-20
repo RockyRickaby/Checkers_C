@@ -130,7 +130,7 @@ struct MinimaxRet {
     double heuristicEval;
 };
 
-static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int maximize);
+static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int alpha, int beta, int maximize);
 static double heuristics(struct Board* gameboard);
 
 static void shuffle(struct Moves* array, size_t n) {
@@ -151,10 +151,10 @@ static struct AiMoves minimax(struct Ai* ai) {
     }
     struct AiMoves res = invalidMove;
     size_t mSize;
-    struct Moves* movesList = boardGetAvailableMovesForPlayer(&ai->checkers->checkersBoard, CHECKERS_PLAYER_TWO, ai->checkers->flags.forceCapture, &mSize);
-    if (mSize > 0) {
-        shuffle(movesList, mSize); 
-    }
+    struct Moves* movesList = boardGetAvailableMovesForPlayer(&ai->checkers->checkersBoard, CHECKERS_PLAYER_TWO, true, &mSize);
+    // if (mSize > 0) {
+    //     shuffle(movesList, mSize); 
+    // }
     double heuristic = LONG_MIN;
     if (ai->checkers->flags.forceCapture && boardCheckIfPlayerCanCapture(&ai->checkers->checkersBoard, CHECKERS_PLAYER_TWO)) {
         for (size_t i = 0; i < mSize; i++) {
@@ -169,7 +169,7 @@ static struct AiMoves minimax(struct Ai* ai) {
                 if (status != CHECKERS_CAPTURE_SUCCESS) {
                     continue;
                 }
-                double tmp = minimaxr(&future, ai->checkers->flags.forceCapture, AI_DEPTH, false);
+                double tmp = minimaxr(&future, ai->checkers->flags.forceCapture, AI_DEPTH, INT_MIN, INT_MAX, false);
                 if (tmp > heuristic) {
                     heuristic = tmp;
                     res = (struct AiMoves){ .valid = 1, .from = movesList[i].from, .to = movesList[i].to[j] };
@@ -186,7 +186,7 @@ static struct AiMoves minimax(struct Ai* ai) {
                 if (status != CHECKERS_MOVE_SUCCESS && status != CHECKERS_CAPTURE_SUCCESS) {
                     continue;   
                 }
-                double tmp = minimaxr(&future, ai->checkers->flags.forceCapture, AI_DEPTH, false);
+                double tmp = minimaxr(&future, ai->checkers->flags.forceCapture, AI_DEPTH, INT_MIN, INT_MAX, false);
                 if (tmp > heuristic) {
                     heuristic = tmp;
                     res = (struct AiMoves){ .valid = 1, .from = movesList[i].from, .to = movesList[i].to[j] };
@@ -201,7 +201,7 @@ static struct AiMoves minimax(struct Ai* ai) {
     return res;
 }
 
-static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int maximize) {
+static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int alpha, int beta, int maximize) {
     if (depth == 0 || gameboard->remainingDarkPieces == 0 || gameboard->remainingLightPieces == 0) {
         return heuristics(gameboard);
     }
@@ -209,7 +209,10 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
         // ai
         double res = INT_MIN;
         size_t movesSize = 0;
-        struct Moves* moves = boardGetAvailableMovesForPlayer(gameboard, CHECKERS_PLAYER_TWO, forceCapture, &movesSize);
+        struct Moves* moves = boardGetAvailableMovesForPlayer(gameboard, CHECKERS_PLAYER_TWO, true, &movesSize);
+        // if (movesSize > 0) {
+        //     shuffle(moves, movesSize); 
+        // }
         if (forceCapture && boardCheckIfPlayerCanCapture(gameboard, CHECKERS_PLAYER_TWO)) {
             for (size_t i = 0; i < movesSize; i++) {
                 if (!boardCheckIfPieceCanCapture(gameboard, CHECKERS_PLAYER_TWO, moves[i].from)) {
@@ -223,10 +226,19 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
                     if (status != CHECKERS_CAPTURE_SUCCESS) {
                         continue;
                     }
-                    double tmp = minimaxr(&future, forceCapture, depth - 1, false);
+                    double tmp = minimaxr(&future, forceCapture, depth - 1, alpha, beta, false);
                     if (tmp > res) {
                         res = tmp;
                     }
+                    if (tmp > alpha) {
+                        alpha = tmp;
+                    }
+                    if (beta <= alpha) {
+                        break;
+                    }
+                }
+                if (beta <= alpha) {
+                    break;
                 }
             }
         } else {
@@ -239,20 +251,32 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
                     if (status != CHECKERS_MOVE_SUCCESS && status != CHECKERS_CAPTURE_SUCCESS) {
                         continue;
                     }
-                    double tmp = minimaxr(&future, forceCapture, depth - 1, false);
+                    double tmp = minimaxr(&future, forceCapture, depth - 1, alpha, beta, false);
                     if (tmp > res) {
                         res = tmp;
                     }
+                    if (tmp > alpha) {
+                        alpha = tmp;
+                    }
+                    if (beta <= alpha) {
+                        break;
+                    }
+                }
+                if (beta <= alpha) {
+                    break;
                 }
             }
         }
         checkersDestroyMovesList(moves, movesSize);
         return res;
-    } else {
+    } else { // TODO
         // player
         double res = INT_MAX;
         size_t movesSize = 0;
-        struct Moves* moves = boardGetAvailableMovesForPlayer(gameboard, CHECKERS_PLAYER_ONE, forceCapture, &movesSize);
+        struct Moves* moves = boardGetAvailableMovesForPlayer(gameboard, CHECKERS_PLAYER_ONE, true, &movesSize);
+        // if (movesSize > 0) {
+        //     shuffle(moves, movesSize); 
+        // }
         if (forceCapture && boardCheckIfPlayerCanCapture(gameboard, CHECKERS_PLAYER_ONE)) {
             for (size_t i = 0; i < movesSize; i++) {
                 if (!boardCheckIfPieceCanCapture(gameboard, CHECKERS_PLAYER_ONE, moves[i].from)) {
@@ -266,10 +290,19 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
                     if (status != CHECKERS_CAPTURE_SUCCESS) {
                         continue;
                     }
-                    double tmp = minimaxr(&future, forceCapture, depth - 1, true);
+                    double tmp = minimaxr(&future, forceCapture, depth - 1, alpha, beta, true);
                     if (tmp < res) {
                         res = tmp;
                     }
+                    if (tmp < beta) {
+                        beta = tmp;
+                    }
+                    if (beta <= alpha) {
+                        break;
+                    }
+                }
+                if (beta <= alpha) {
+                    break;
                 }
             }
         } else {
@@ -282,10 +315,19 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
                     if (status != CHECKERS_MOVE_SUCCESS && status != CHECKERS_CAPTURE_SUCCESS) {
                         continue;
                     }
-                    double tmp = minimaxr(&future, forceCapture, depth - 1, true);
+                    double tmp = minimaxr(&future, forceCapture, depth - 1, alpha, beta, true);
                     if (tmp < res) {
                         res = tmp;
                     }
+                    if (tmp < beta) {
+                        beta = tmp;
+                    }
+                    if (beta <= alpha) {
+                        break;
+                    }
+                }
+                if (beta <= alpha) {
+                    break;
                 }
             }
         }

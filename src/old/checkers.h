@@ -65,9 +65,11 @@ void boardTryTurnKing(struct Board* gameboard, struct Point piecePos);
 int boardRemainingPiecesTotal(struct Board* gameboard);
 int boardRemainingPiecesPlayer(struct Board* gameboard, int player);
 int boardGetAvailableMovesForPiece(struct Board* gameboard, struct Point piecePos, struct Point** out, int includeBackwardsCaptures);
-struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int player, int forceCapture, size_t* out_size);
+struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int player, int includeBackwardsCaptures, size_t* out_size);
 int boardCheckIfPieceCanCapture(struct Board* gameboard, int player, struct Point pos);
 int boardCheckIfPlayerCanCapture(struct Board* gameboard, int player);
+// int boardCheckIfPieceHasAvailableMoves(struct Board* gameboard, int player, struct Point pos);
+int boardCheckIfPlayerHasAvailableMoves(struct Board* gameboard, int player);
 void boardPrint(struct Board* gameboard);
 
 // ---
@@ -79,6 +81,7 @@ int checkersGetWinner(struct Checkers* game);
 // int checkersGetClosestEnemies(struct Checkers* game, struct Point playerPos, struct Point* enemiesPos); /* receives output buffer and returns size */
 int checkersPlayerShallCapture(struct Checkers* game);
 struct Moves* checkersGetAvailableMovesForPlayer(struct Checkers* game, size_t* out_size);
+int checkersPlayerCanMove(struct Checkers* game);
 void checkersDestroyMovesList(struct Moves* moves, size_t moves_size);
 void checkersPrint(struct Checkers* game);
 

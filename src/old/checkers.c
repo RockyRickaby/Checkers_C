@@ -263,7 +263,7 @@ int boardGetAvailableMovesForPiece(struct Board* gameboard, struct Point piecePo
     return count;
 }
 
-struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int player, int forceCapture, size_t* out_size) {
+struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int player, int includeBackwardsCaptures, size_t* out_size) {
     char piece, king;
     if (player == CHECKERS_PLAYER_ONE) {
         piece = gameboard->pieceLightMan;
@@ -289,7 +289,7 @@ struct Moves* boardGetAvailableMovesForPlayer(struct Board* gameboard, int playe
             if (gameboard->board[y][x] == piece || gameboard->board[y][x] == king) {
                 struct Moves mov = {0};
                 mov.from = (struct Point){ .x = x, .y = y };
-                int count = boardGetAvailableMovesForPiece(gameboard, mov.from, &mov.to, forceCapture);
+                int count = boardGetAvailableMovesForPiece(gameboard, mov.from, &mov.to, includeBackwardsCaptures);
                 if (count > 0 && mov.to != NULL) {
                     mov.to_size = count;
                     list[size++] = mov;
@@ -418,6 +418,14 @@ int boardCheckIfPlayerCanCapture(struct Board* gameboard, int player) {
     return should;
 }
 
+int boardCheckIfPlayerHasAvailableMoves(struct Board* gameboard, int player) {
+    size_t stmp = 0;
+    struct Moves* tmp = boardGetAvailableMovesForPlayer(gameboard, player, 1, &stmp);
+    int res = stmp > 0;
+    checkersDestroyMovesList(tmp, stmp);
+    return res;
+}
+
 void boardPrint(struct Board* gameboard) {
     if (gameboard) {
         printf(
@@ -485,9 +493,10 @@ int checkersMakeMove(struct Checkers* game, struct Point from, struct Point to) 
         return 0;
     }
 
+    // TODO - Check if players have available moves left
     int status = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
     if (status == CHECKERS_CAPTURE_SUCCESS) {
-        if (boardRemainingPiecesPlayer(&game->checkersBoard, enemy) == 0) {
+        if (boardRemainingPiecesPlayer(&game->checkersBoard, enemy) == 0 || !checkersPlayerCanMove(game)) {
             game->state = nextStateWin;
             game->flags.run = 0;
             game->turnsTotal += 1;
@@ -549,6 +558,10 @@ struct Moves* checkersGetAvailableMovesForPlayer(struct Checkers* game, size_t* 
         return NULL;
     }
     return boardGetAvailableMovesForPlayer(&game->checkersBoard, checkersGetCurrentPlayer(game), game->flags.forceCapture, out_size);
+}
+
+int checkersPlayerCanMove(struct Checkers* game) {
+    return boardCheckIfPlayerHasAvailableMoves(&game->checkersBoard, checkersGetCurrentPlayer(game));
 }
 
 void checkersDestroyMovesList(struct Moves* moves, size_t moves_size) {
