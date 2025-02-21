@@ -45,7 +45,7 @@ static inline int isMan(Piece* p) { return p->type == PIECE_LIGHT_MAN || p->type
 static inline int isKing(Piece* p) { return p->type == PIECE_LIGHT_KING || p->type == PIECE_DARK_KING; }
 static inline int isEmptyField(Piece* p) { return p->type == PIECE_EMPTY_FIELD; }
 static inline int isPiece(Piece* p) { return isDark(p) || isLight(p); }
-static inline int isEnemyOf(Piece* p1, Piece* p2) { return (p1->type == p2->enemies.man || p1->type == p2->enemies.king) && (p2->type == p1->enemies.man || p2->type == p1->enemies.king); }
+static inline int isEnemy(Piece* p1, Piece* p2) { return (isLight(p1) && isDark(p2)) || (isLight(p2) && isDark(p1)); }
 static inline int isFriend(Piece* p1, Piece* p2) { return (isLight(p1) && isLight(p2)) || (isDark(p1) && isDark(p2)); }
 
 static int canCapture(Board* gameboard, int from);
@@ -61,8 +61,10 @@ int boardInit(Board* gameboard) {
     const int pamount = CHECKERS_PIECES_AMOUNT;
 
     memset(gameboard, 0, sizeof(Board));
-    gameboard->remainingDarkPieces = pamount;
-    gameboard->remainingLightPieces = pamount;
+    gameboard->remainingDarkMen = pamount;
+    gameboard->remainingLightMen = pamount;
+    gameboard->remainingDarkKings = 0;
+    gameboard->remainingLightKings = 0;
     gameboard->boardSize = bsize;
     gameboard->recentlyMovedPiece = -1;
     
@@ -124,26 +126,14 @@ int boardTryMoveOrCapture(Board* gameboard, int player, int from, int to) {
     if (!isEmptyField(p2) || !validMove(gameboard, player, from, to)) {
         return CHECKERS_INVALID_MOVE;
     }
+    if (gameboard->recentlyMovedPiece != -1 && gameboard->recentlyMovedPiece != from) {
+        return CHECKERS_ONGOING_TURN;
+    }
     return movePiece(gameboard, player, from, to);
 }
 
+// TODO - remove this
 int boardTryTurnKing(Board* gameboard, int piecePos) {
-    if (gameboard && validPos(piecePos)) {
-        Piece* p = gameboard->board + piecePos;
-        if (p->alive) {
-            if (p->type == PIECE_LIGHT_MAN && piecePos < CHECKERS_PIECES_PER_LINE) {
-                p->type == PIECE_LIGHT_KING;
-                return 1;
-            } else if (p->type == PIECE_DARK_MAN && piecePos >= (CHECKERS_PIECES_PER_LINE * (CHECKERS_BOARD_SIZE - 1))) {
-                p->type == PIECE_DARK_KING;
-                return 1;
-            } else {
-                return 0;
-            }
-        } else {
-            return 0;
-        }
-    }
     return 0;
 }
 
@@ -151,7 +141,8 @@ int boardRemainingPiecesTotal(const Board* gameboard) {
     if (!gameboard) {
         return -1;
     }
-    return gameboard->remainingDarkPieces + gameboard->remainingLightPieces;
+    return gameboard->remainingDarkMen + gameboard->remainingLightMen +
+        gameboard->remainingDarkKings + gameboard->remainingLightKings;
 }
 
 int boardRemainingPiecesPlayer(const Board* gameboard, int player) {
@@ -159,26 +150,42 @@ int boardRemainingPiecesPlayer(const Board* gameboard, int player) {
         return -1;
     }
     if (player == CHECKERS_PLAYER_LIGHT) {
-        return gameboard->remainingLightPieces;
+        return gameboard->remainingLightMen + gameboard->remainingLightKings;
     } else {
-        return gameboard->remainingDarkPieces;
+        return gameboard->remainingDarkMen + gameboard->remainingDarkKings;
     }
 }
 
+/* should always be called at the end of a turn */
 int boardUpdate(Board* gameboard) {
     if (gameboard) {
         for (int i = 0; i < gameboard->boardSize; i++) {
             Piece* p = gameboard->board + i;
-            if (p->type != PIECE_EMPTY_FIELD && !p->alive) {
-                if (isLight(p)) {
-                    gameboard->remainingLightPieces -= 1;
-                } else if (isDark(p)) {
-                    gameboard->remainingDarkPieces -= 1;
+            if (isPiece(p) && !p->alive) {
+                if (p->type == PIECE_LIGHT_MAN) {
+                    gameboard->remainingLightMen -= 1;
+                } else if (p->type == PIECE_DARK_MAN) {
+                    gameboard->remainingDarkMen -= 1;
+                } else if (p->type == PIECE_LIGHT_KING) {
+                    gameboard->remainingLightKings -= 1;
+                } else if (p->type == PIECE_DARK_KING) {
+                    gameboard->remainingDarkKings -= 1;
                 }
                 *p = emptyField;
             }
         }
-        gameboard->recentlyMovedPiece = -1; 
+        Piece* p = gameboard->board + gameboard->recentlyMovedPiece;
+        if (p->type == PIECE_LIGHT_MAN && gameboard->recentlyMovedPiece < CHECKERS_PIECES_PER_LINE) {
+            p->type = PIECE_LIGHT_KING;
+            gameboard->remainingLightKings += 1;
+            gameboard->remainingLightMen -= 1;
+        } else if (p->type == PIECE_DARK_MAN && gameboard->recentlyMovedPiece >= (CHECKERS_PIECES_PER_LINE * (CHECKERS_BOARD_SIZE - 1))) {
+            p->type = PIECE_DARK_KING;
+            gameboard->remainingDarkKings += 1;
+            gameboard->remainingDarkMen -= 1;
+        }
+        gameboard->board[gameboard->recentlyMovedPiece].recentlyMoved = 0;
+        gameboard->recentlyMovedPiece = -1;
         return 1;
     }
     return 0;
@@ -198,8 +205,54 @@ struct Piece boardGetPieceAtP(const Board* gameboard, Point piecePos) {
     return gameboard->board[POINT_TO_IDX(piecePos.x, piecePos.y)];
 }
 
-int boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int** out);
-Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_t* out_size);
+int boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int** out) {
+    if (!gameboard || !validPos(piecePos)) {
+        return -1;
+    }
+    if (!out) {
+        return -1;
+    }
+    Piece* p = gameboard->board + piecePos;
+    if (!isPiece(p)) {
+        *out = NULL;
+        return 0;
+    }
+    size_t cap = 10;
+    size_t size = 0;
+    int* buf = malloc(sizeof(int) * cap);
+    if (!buf) {
+        *out = NULL;
+        return 0;
+    }
+
+    // TODO - finish this
+    if (isKing(p)) {
+        // TODO - handle get moves for king
+        size = 0;
+    } else {
+        size = 0;
+    }
+    
+    if (size == 0) {
+        free(buf);
+        *out = NULL;
+        return 0;
+    }
+    int* tmp = realloc(buf, size);
+    if (!tmp) {
+        free(buf);
+        *out = NULL;
+        return 0;
+    }
+    *out = tmp;
+    return size;
+}
+
+Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_t* out_size) {
+    // TODO - finish this
+    return NULL;
+}
+
 int boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos, int** out);
 Moves* boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player, size_t* out_size);
 
@@ -245,6 +298,11 @@ static int canCapture(Board* gameboard, int from) {
   * If we can recreate the {to} value from the starting position {from}
   * plus a few offsets, as long as the movement can be done without
   * obstructions or leads to a valid capture, it is valid.
+  * 
+  * This function doesn't make any checks to make sure that the arguments
+  * are valid nor that they actually point to valid pieces (as in, that the 
+  * player is moving the right piece and the piece is alive). This should be
+  * done BEFORE calling it.
   */
 static int validMove(Board* gameboard, int player, int from, int to) {
     Point playerPos = IDX_TO_POINT(from);
@@ -254,25 +312,20 @@ static int validMove(Board* gameboard, int player, int from, int to) {
         .y = toPos.y - playerPos.y,
     };
     Point vec = {
-        .x = direction.x < 0 ? -1 : 1,  /* -1, cima; 1, baixo */
+        .x = direction.x < 0 ? -1 : 1,  /* -1, up; 1, down */
         .y = direction.y < 0 ? -1 : 1,  
     };
     if (abs(direction.x) != abs(direction.y)) {
         return 0;
     }
 
-    int illegalMoveFlag = player == CHECKERS_PLAYER_LIGHT ? -1 : 1; /* -1, baixo; 1, cima */
+    int illegalMove = player == CHECKERS_PLAYER_LIGHT ? -1 : 1; /* -1, down; 1, up */
     int vdir = V_DIRECTION(from, to);
-    int hdir = H_DIRECTION(from, to);
     unsigned int lines = abs(vdir);
 
     Piece* playerPiece = gameboard->board + from;
 
     if (isKing(playerPiece)) {
-        /**
-         * iterate over positions and check if the king can properly move
-         * (and maybe capture ONE alive enemy)
-         */
         int canMakeMove = 1;
         int off = 0, enemyCount = 0;
         Piece* p = NULL;
@@ -281,7 +334,7 @@ static int validMove(Board* gameboard, int player, int from, int to) {
             from += off;
 
             p = gameboard->board + from;
-            if (isEnemyOf(playerPiece, p)) {
+            if (isEnemy(playerPiece, p)) {
                 if (p->alive) {
                     enemyCount++;
                     if (enemyCount > 1) {
@@ -300,12 +353,12 @@ static int validMove(Board* gameboard, int player, int from, int to) {
         return canMakeMove;
     } else if (isMan(playerPiece)) {
         if (lines == 1) {
-            return illegalMoveFlag != vdir;
+            return illegalMove != vdir;
         } else if (lines == 2) { /* should be capture only */
             playerPos.x += vec.x;
             playerPos.y += vec.y;
             int idx = POINT_TO_IDX(playerPos.x, playerPos.y);
-            return isEnemyOf(playerPiece, gameboard->board + idx) &&
+            return isEnemy(playerPiece, gameboard->board + idx) &&
                 gameboard->board[idx].alive;
         } else {
             return 0;
@@ -317,58 +370,53 @@ static int validMove(Board* gameboard, int player, int from, int to) {
 
 /* movement/capture should be guaranteed to happen before this function is called  */
 static int movePiece(Board* gameboard, int player, int from, int to) {
+    gameboard->recentlyMovedPiece = to;
     Point playerPos = IDX_TO_POINT(from);
     Point toPos = IDX_TO_POINT(to);
-    Point direction = {
-        .x = toPos.x - playerPos.x,
-        .y = toPos.y - playerPos.y,
-    };
     Point vec = {
-        .x = direction.x < 0 ? -1 : 1,  /* -1, cima; 1, baixo */
-        .y = direction.y < 0 ? -1 : 1,  
+        .x = toPos.x - playerPos.x < 0 ? -1 : 1,
+        .y = toPos.y - playerPos.y < 0 ? -1 : 1,  /* -1, up; 1, down */
     };
     unsigned int lines = LINES_MOVED(from, to);
     Piece* playerPiece = gameboard->board + from;
     Piece* targetField = gameboard->board + to;
-    Piece playerBackup = *playerPiece;
-
+    playerPiece->recentlyMoved = 1;
     /* all movement is assumed to be valid */
     if (isKing(playerPiece)) {
-        int off = 0, enemyCount = 0;
+        int returnStatus = CHECKERS_MOVE_SUCCESS;
+        int off = 0;
         Piece* p = NULL;
         while (from != to) {
             off = fromVecToOffset(vec, from);
             from += off;
 
-            /* find enemy, capture and jump to destination */
             p = gameboard->board + from;
-            if (isEnemyOf(playerPiece, p)) {
+            if (isEnemy(playerPiece, p)) {
+                returnStatus = CHECKERS_CAPTURE_SUCCESS;
                 p->alive = 0;
                 from = to;
             }
         }
         *targetField = *playerPiece;
         *playerPiece = emptyField;
-        return CHECKERS_MOVE_SUCCESS;
+        return returnStatus;
     } else if (isMan(playerPiece)) {
+        int returnStatus = CHECKERS_MOVE_SUCCESS;
         if (lines == 2) {
             playerPos.x += vec.x;
             playerPos.y += vec.y;
             gameboard->board[POINT_TO_IDX(playerPos.x, playerPos.y)].alive = 0;
-            *targetField = *playerPiece;
-            *playerPiece = emptyField;
-            return CHECKERS_CAPTURE_SUCCESS;
-        } else {
-            *targetField = *playerPiece;
-            *playerPiece = emptyField;
-            return CHECKERS_MOVE_SUCCESS;
+            returnStatus = CHECKERS_CAPTURE_SUCCESS;
         }
+        *targetField = *playerPiece;
+        *playerPiece = emptyField;
+        return returnStatus;
     } else {
         return CHECKERS_NOT_A_PIECE;
     }
 }
 
-/* -1, up; 1, down */
+/* y = -1, up; 1, down */
 static int fromVecToOffset(Point vec, int from) {
     if (abs(vec.x) > 1 || abs(vec.y) > 1) {
         vec.x = vec.x < 0 ? -1 : 1;

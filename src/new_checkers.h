@@ -20,6 +20,7 @@
 #define CHECKERS_INVALID_PLAYER     -4
 #define CHECKERS_NOT_A_PIECE        -5
 #define CHECKERS_DEAD_PIECE         -6
+#define CHECKERS_ONGOING_TURN       -7
 // =======================================================================
 #define V_DIRECTION(from, to)       ((int) roundf((float) ((from) - (to)) / (float) CHECKERS_PIECES_PER_LINE))
 #define H_DIRECTION(from, to)       ((from) - (to))
@@ -66,6 +67,8 @@ typedef enum GameState {
 
 typedef struct Piece {
     PieceType type;
+     // TODO - consider removing this unnamed struct
+     // if it turns out to be unnecessary
     struct {
         PieceType man;
         PieceType king;
@@ -78,20 +81,24 @@ typedef struct Board {
     Piece* board;
     uint16_t boardSize;
     int16_t recentlyMovedPiece;
-    uint8_t remainingLightPieces;
-    uint8_t remainingDarkPieces;
+
+    uint8_t remainingLightMen;
+    uint8_t remainingDarkMen;
+    uint8_t remainingLightKings;
+    uint8_t remainingDarkKings;
 } Board;
 
 typedef struct Checkers {
-    struct {
-        uint8_t forceCapture;
-        uint8_t run;
-        uint8_t aiEnabled;
-        uint8_t currentlyCapturing;
-    } flags;
     int turnsTotal;
     GameState state;
     Board checkersBoard;
+    struct {
+        uint8_t run;
+        uint8_t currentlyCapturing;
+        uint8_t forceCapture;
+        uint8_t autoCapture;
+        uint8_t aiEnabled;
+    } flags;
 } Checkers;
 
 typedef struct Moves {
