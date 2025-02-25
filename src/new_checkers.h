@@ -54,7 +54,6 @@ typedef enum PieceType {
     PIECE_LIGHT_MAN,
     PIECE_DARK_KING,
     PIECE_DARK_MAN,
-    PIECE_NONE,
 } PieceType;
 
 typedef enum GameState {
@@ -67,19 +66,13 @@ typedef enum GameState {
 
 typedef struct Piece {
     PieceType type;
-     // TODO - consider removing this unnamed struct
-     // if it turns out to be unnecessary
-    struct {
-        PieceType man;
-        PieceType king;
-    } enemies;
     uint8_t alive;
     uint8_t recentlyMoved;
 } Piece;
 
 typedef struct Board {
     Piece* board;
-    uint16_t boardSize;
+    size_t boardSize;
     int16_t recentlyMovedPiece;
 
     uint8_t remainingLightMen;
@@ -111,21 +104,21 @@ typedef struct Moves {
 
 int boardInit(Board* gameboard);
 int boardTryMoveOrCapture(Board* gameboard, int player, int from, int to);
-int boardTryTurnKing(Board* gameboard, int piecePos);
 int boardRemainingPiecesTotal(const Board* gameboard);
 int boardRemainingPiecesPlayer(const Board* gameboard, int player);
 int boardUpdate(Board* gameboard); /* called at the end of a player's turn. used to remove from the board the pieces captured during a turn */
 
 struct Piece boardGetPieceAt(const Board* gameboard, int pos);
 struct Piece boardGetPieceAtP(const Board* gameboard, Point pos);
-int boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int** out);
+size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int** out);
 Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_t* out_size);
-int boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos, int** out);
+size_t boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos, int** out);
 Moves* boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player, size_t* out_size);
+void boardDestroyMovesList(struct Moves* moves, size_t moves_size);
 
-int boardCheckIfPieceHasAvailableMoves(const Board* gameboard, int player, int pos);
+int boardCheckIfPieceHasAvailableMoves(const Board* gameboard, int pos);
 int boardCheckIfPlayerHasAvailableMoves(const Board* gameboard, int player);
-int boardCheckIfPieceCanCapture(const Board* gameboard, int player, int pos);
+int boardCheckIfPieceCanCapture(const Board* gameboard, int pos);
 int boardCheckIfPlayerCanCapture(const Board* gameboard, int player);
 void boardPrint(const Board* gameboard);
 void boardFreeInternalBoard(Board* gameboard);
