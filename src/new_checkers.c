@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
+#include <errno.h>
 
 #define BLK "\e[0;30m"
 #define BWHT "\e[1;37m"
@@ -15,6 +16,7 @@ typedef struct Node {
     int value;
 } Node;
 
+/* cursed */
 typedef struct CaptureStack {
     Node* top;
     size_t size;
@@ -63,6 +65,9 @@ static inline int canCapture(const Board* gameboard, int from, int to, Point toP
 static int movePiece(Board* gameboard, int from, int to);
 static int validMove(Board* gameboard, int player, int from, int to);
 
+static int longestCaptureForMan(const Board* gameboard, int player, int piecePos, int** out, size_t* size, CaptureStack* stack);
+static int longestCaptureForKing(const Board* gameboard, int player, int piecePos, int** out, size_t* size, CaptureStack* stack);
+
 int boardInit(Board* gameboard) {
     if (!gameboard) {
         return 0;
@@ -91,6 +96,7 @@ int boardInit(Board* gameboard) {
     
     Piece* board = calloc(bsize, sizeof(Piece));
     if (board == NULL) {
+        perror("Could not initialize board");
         memset(gameboard, 0, sizeof(Board));
         return 0;
     }
@@ -232,6 +238,7 @@ size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int*
     size_t size = 0;
     int* buf = malloc(sizeof(int) * cap);
     if (!buf) {
+        perror("Could not malloc buffer");
         *out = NULL;
         return 0;
     }
@@ -286,6 +293,7 @@ size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int*
                     cap *= 1.5f;
                     int* tmp = realloc(buf, sizeof(int) * cap);
                     if (!tmp) {
+                        perror("Could not realloc buffer");
                         free(buf);
                         *out = NULL;
                         return 0;
@@ -327,6 +335,7 @@ size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int*
     } else {
         int* tmp = realloc(buf, sizeof(int) * size);
         if (!tmp) {
+            perror("Could not realloc buffer");
             free(buf);
             *out = NULL;
             return 0;
@@ -344,6 +353,7 @@ Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_
     size_t cap = 10;
     Moves* moves = malloc(sizeof(Moves) * cap);
     if (!moves) {
+        perror("Could not malloc buffer");
         *out_size = 0;
         return NULL;
     }
@@ -352,22 +362,23 @@ Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_
             int* buf = NULL;
             size_t bufsize = boardGetAvailableMovesForPiece(gameboard, i, &buf);
             if (bufsize > 0) {
-                moves[size] = (Moves) {
-                    .from = i,
-                    .to = buf,
-                    .to_size = bufsize
-                };
-                size++;
                 if (size >= cap) {
                     cap *= 1.5f;
                     Moves* tmp = realloc(moves, sizeof(Moves) * cap);
                     if (!tmp) {
+                        perror("Could not realloc buffer");
                         *out_size = 0;
                         free(moves);
                         return NULL;
                     }
                     moves = tmp;
                 }
+                moves[size] = (Moves) {
+                    .from = i,
+                    .to = buf,
+                    .to_size = bufsize
+                };
+                size++;
             }
         }
     }
@@ -378,6 +389,7 @@ Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_
     } else {
         Moves* tmp = realloc(moves, sizeof(Moves) * size);
         if (!tmp) {
+            perror("Could not realloc buffer");
             free(moves);
             *out_size = 0;
             return NULL;
@@ -388,13 +400,6 @@ Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_
     return moves;
 }
 
-static int longestCaptureForMan(const Board* gameboard, int player, int piecePos, int** out, size_t* size, CaptureStack* stack);
-static size_t longestCaptureForKing(const Board* gameboard, int piecePos, int** out) {
-    *out = NULL;
-    return 0;
-}
-
-/* TODO - finish these. it's gonna be complicated... */
 size_t boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos, int** out) {
     if (!gameboard || !validPos(piecePos) || !out) {
         if (out) {
@@ -407,17 +412,17 @@ size_t boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos
         return 0;
     }
     *out = NULL;
+    size_t size = 0;
+    CaptureStack stack = { .top = NULL, .size = 0 };
+    stack.top = &(Node) {
+        .next = NULL,
+        .value = piecePos,
+    };
+    stack.size = 1;
     if (isKing(gameboard->board + piecePos)) {
-        size_t size = longestCaptureForKing(gameboard, piecePos, out);
+        int l = longestCaptureForKing(gameboard, (isLight(gameboard->board + piecePos) ? CHECKERS_PLAYER_LIGHT : CHECKERS_PLAYER_DARK), piecePos, out, &size, &stack);
         return size;
     } else if (isMan(gameboard->board + piecePos)) {
-        size_t size = 0;
-        CaptureStack stack = { .top = NULL, .size = 0 };
-        stack.top = &(Node) {
-            .next = NULL,
-            .value = piecePos,
-        };
-        stack.size = 1;
         int l = longestCaptureForMan(gameboard, (isLight(gameboard->board + piecePos) ? CHECKERS_PLAYER_LIGHT : CHECKERS_PLAYER_DARK), piecePos, out, &size, &stack);
         return size;
     } else {
@@ -426,8 +431,36 @@ size_t boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos
     }
 }
 
-/* will this be slow...? */
-Moves* boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player, size_t* out_size);
+/* TODO will this be slow...? */
+size_t boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player, int** out) {
+    if (!gameboard || !validPlayer(player) || !out) {
+        if (out) {
+            *out = NULL;
+        }
+        return 0;
+    }
+    size_t size = 0;
+    int* buf = NULL; 
+    for (size_t i = 0; i < gameboard->boardSize; i++) {
+        if ((player == CHECKERS_PLAYER_LIGHT && isLight(gameboard->board + i)) || (player == CHECKERS_PLAYER_DARK && isDark(gameboard->board + i))) {
+            int* tmp = NULL;
+            size_t tmpsize = boardGetLongestCaptureStreakForPiece(gameboard, i, &tmp);
+            if (tmpsize > size) {
+                if (buf) {
+                    free(buf);
+                }
+                buf = tmp;
+                size = tmpsize;
+            } else {
+                if (tmp) {
+                    free(tmp);
+                }
+            }
+        }
+    }
+    *out = buf;
+    return size;
+}
 
 void boardDestroyMovesList(struct Moves* moves, size_t moves_size) {
     for (size_t i = 0; i < moves_size; i++) {
@@ -569,6 +602,12 @@ void boardFreeInternalBoard(Board* gameboard) {
 }
 
 /**
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
  * 
  * 
  * 
@@ -765,16 +804,16 @@ static int longestCaptureForMan(const Board* gameboard, int player, int piecePos
                  * clone board, make capture, store move, recursively check for
                  * more captures, save longest moves list, backtrack
                  */
-                Board tmp = {0};
-                deepcopy(gameboard, &tmp);
+                Board future = {0};
+                deepcopy(gameboard, &future);
                 Point dest = {
                     .x = toP.x + dir.x,
                     .y = toP.y + dir.y,
                 };
                 int newpos = POINT_TO_IDX(dest.x, dest.y);
                 /* this should never happen if we can, in fact, capture a piece */
-                if (boardTryMoveOrCapture(&tmp, player, piecePos, newpos) != CHECKERS_CAPTURE_SUCCESS) {
-                    boardFreeInternalBoard(&tmp);
+                if (boardTryMoveOrCapture(&future, player, piecePos, newpos) != CHECKERS_CAPTURE_SUCCESS) {
+                    boardFreeInternalBoard(&future);
                     continue;
                 }
                 /* push move to stack */
@@ -785,8 +824,8 @@ static int longestCaptureForMan(const Board* gameboard, int player, int piecePos
                 stack->top = &t;
                 stack->size++;
                 /* check if size is greater than prev and pop move from stack */
-                if (!longestCaptureForMan(&tmp, player, newpos, out, size, stack)) {
-                    /* found out last move for this path. save it, then compare */
+                if (!longestCaptureForMan(&future, player, newpos, out, size, stack)) {
+                    /* found our last move for this path. save it, then compare */
                     if (stack->size > *size) {
                         *size = stack->size;
                         size_t counter = stack->size;
@@ -804,7 +843,119 @@ static int longestCaptureForMan(const Board* gameboard, int player, int piecePos
                 }
                 stack->top = stack->top->next;
                 stack->size--;
-                boardFreeInternalBoard(&tmp);
+                boardFreeInternalBoard(&future);
+            }
+        }
+    }
+    return couldCapture;
+}
+
+static int longestCaptureForKing(const Board* gameboard, int player, int piecePos, int** out, size_t* size, CaptureStack* stack) {
+    /* TODO - finish this. This will not be easy I believe... */
+    int m = IS_EVEN_LINE(piecePos) ? 1 : -1;
+    Point fromP = IDX_TO_POINT(piecePos);
+
+    int couldCapture = 0;
+
+    for (int i = 0; i < 4; i++) {
+        int to = piecePos + m * movementOffsets[i];
+        Point toP = IDX_TO_POINT(to);
+        Point vec = {
+            .x = toP.x - fromP.x < 0 ? -1 : 1,
+            .y = toP.y - fromP.y < 0 ? -1 : 1,
+        };
+        to = piecePos;
+        toP = IDX_TO_POINT(to);
+        int off = 0;
+        int capturingMove = 0;
+        while (1) {
+            off = fromVecToOffset(vec, to);
+            to += off;
+            toP.x += vec.x;
+            toP.y += vec.y;
+
+            if (!validIndex(toP.x, toP.y) || !validPos(to)) {
+                break;
+            }
+
+            if (!isEmptyField(gameboard->board + to)) {
+                if (canCapture(gameboard, piecePos, to, toP, vec) && !capturingMove) {
+                    capturingMove = 1;
+                    Point destP = {
+                        .x = toP.x + vec.x,
+                        .y = toP.y + vec.y,
+                    };
+                    int dest = POINT_TO_IDX(destP.x, destP.y);
+                    couldCapture = 1;
+                    Board future = {0};
+                    deepcopy(gameboard, &future);
+                    if (boardTryMoveOrCapture(&future, player, piecePos, dest) != CHECKERS_CAPTURE_SUCCESS) {
+                        break;
+                    }
+                    Node t = {
+                        .next = stack->top,
+                        .value = dest,
+                    };
+                    stack->top = &t;
+                    stack->size++;
+                    if (!longestCaptureForKing(&future, player, dest, out, size, stack)) {
+                        if (stack->size >= *size) {
+                            *size = stack->size;
+                            size_t counter = stack->size;
+                            int* tmp = malloc(sizeof(int) * stack->size);
+                            if (*out) {
+                                free(*out);
+                                *out = NULL;
+                            }
+                            for (Node* n = stack->top; n != NULL; n = n->next) {
+                                tmp[counter - 1] = n->value;
+                                counter--;
+                            }
+                            *out = tmp;
+                        }
+                    }
+                    /* handle move, get place behind enemy piece and capture */
+                    stack->top = stack->top->next;
+                    stack->size--;
+                    boardFreeInternalBoard(&future);
+                } else {
+                    break;
+                }
+            } else if (capturingMove) {
+                /* TODO */
+                Point destP = toP;
+                int dest = to;
+                Board future = {0};
+                deepcopy(gameboard, &future);
+                if (boardTryMoveOrCapture(&future, player, piecePos, dest) != CHECKERS_CAPTURE_SUCCESS) {
+                    break;
+                }
+                Node t = {
+                    .next = stack->top,
+                    .value = dest,
+                };
+                stack->top = &t;
+                stack->size++;
+                if (!longestCaptureForKing(&future, player, dest, out, size, stack)) {
+                    if (stack->size >= *size) {
+                        *size = stack->size;
+                        size_t counter = stack->size;
+                        int* tmp = malloc(sizeof(int) * stack->size);
+                        if (*out) {
+                            free(*out);
+                            *out = NULL;
+                        }
+                        for (Node* n = stack->top; n != NULL; n = n->next) {
+                            tmp[counter - 1] = n->value;
+                            counter--;
+                        }
+                        *out = tmp;
+                    }
+                }
+                /* handle move, get place behind enemy piece and capture */
+                stack->top = stack->top->next;
+                stack->size--;
+                boardFreeInternalBoard(&future);
             }
         }
     }

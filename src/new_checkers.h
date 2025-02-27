@@ -113,7 +113,7 @@ struct Piece boardGetPieceAtP(const Board* gameboard, Point pos);
 size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int** out);
 Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_t* out_size);
 size_t boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos, int** out);
-Moves* boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player, size_t* out_size);
+size_t boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player, int** out);
 void boardDestroyMovesList(struct Moves* moves, size_t moves_size);
 
 int boardCheckIfPieceHasAvailableMoves(const Board* gameboard, int pos);
