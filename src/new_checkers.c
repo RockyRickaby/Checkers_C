@@ -68,6 +68,18 @@ static int validMove(Board* gameboard, int player, int from, int to);
 static int longestCaptureForMan(const Board* gameboard, int player, int piecePos, int** out, size_t* size, CaptureStack* stack);
 static int longestCaptureForKing(const Board* gameboard, int player, int piecePos, int** out, size_t* size, CaptureStack* stack);
 
+static inline int handleState(Checkers* game, int from, int to);
+
+/**
+ * 
+ * ####  ##### ##### ####  ####
+ * #   # #   # #   # #   # #   #
+ * ####  #   # ##### ####  #   #
+ * #   # #   # #   # #  #  #   #
+ * ####  ##### #   # #   # ####
+ * Board implementation
+ */
+
 int boardInit(Board* gameboard) {
     if (!gameboard) {
         return 0;
@@ -269,7 +281,7 @@ size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int*
                 if (!validPos(to) || !validIndex(toP.x, toP.y)) {
                     break;
                 }
-                Piece* p = gameboard->board + to;
+                p = gameboard->board + to;
                 if (isEmptyField(p)) {
                     buf[size] = to;
                     size += 1;
@@ -431,7 +443,6 @@ size_t boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos
     }
 }
 
-/* TODO will this be slow...? */
 size_t boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player, int** out) {
     if (!gameboard || !validPlayer(player) || !out) {
         if (out) {
@@ -532,7 +543,7 @@ int boardCheckIfPieceCanCapture(const Board* gameboard, int pos) {
                 if (!validPos(to) || !validIndex(toP.x, toP.y)) {
                     break;
                 }
-                Piece* p = gameboard->board + to;
+                p = gameboard->board + to;
                 if (isEmptyField(p)) {
                     continue;
                 } else if (canCapture(gameboard, pos, to, toP, vec)) {
@@ -602,15 +613,293 @@ void boardFreeInternalBoard(Board* gameboard) {
 }
 
 /**
+ *
+ * ##### #   # ##### ##### #   # ##### ####  #####
+ * #     #   # #     #     #  #  #     #   # #
+ * #     ##### ##### #     ###   ##### ####  #####
+ * #     #   # #     #     #  #  #     #  #      #
+ * ##### #   # ##### ##### #   # ##### #   # #####
+ * Checkers implementation
+ */
+
+int checkersInit(Checkers* game, int forceCapture, int autocapture, int enableAi) {
+    if (!game) {
+        return 0;
+    }
+    memset(game, 0, sizeof(Checkers));
+    boardInit(&game->checkersBoard);
+    game->turnsTotal = 0;
+    game->state = CSTATE_P1_TURN;
+
+    game->flags.aiEnabled    =  enableAi ? 1 : 0;
+    game->flags.autoCapture  =  autocapture ? 1 : 0;
+    game->flags.forceCapture =  forceCapture ? 1 : 0;
+
+    game->flags.run = 1;
+    game->flags.needsUpdate = 0;
+    game->flags.currentlyCapturing = 0;
+    return 1;
+}
+
+int checkersFreeBoard(Checkers* game) {
+    if (game) {
+        boardFreeInternalBoard(&game->checkersBoard);
+        memset(game, 0, sizeof(Checkers));
+        return 1;
+    }
+    return 0;
+}
+
+/**
+ * Return values:
+ * ret < 0 = ERROR VALUES
+ * ret > 0 = SUCCESS VALUES
+ * ret == 0 = ABSOLUTELY NOTHING HAS HAPPENED
+ */
+int checkersMakeMove(Checkers* game, int from, int to) {
+    if (!game) {
+        return CHECKERS_NULL_BOARD;
+    }
+    if (!game->flags.run) {
+        return CHECKERS_END_GAME;
+    }
+    if (!validPos(from) || !validPos(to)) {
+        return CHECKERS_INVALID_MOVE;
+    }
+    int enemy = -1;
+    int player = -1;
+    GameState nextPlayer = {0};
+    GameState nextCapturing = {0};
+    if (game->state == CSTATE_P1_TURN || game->state == CSTATE_P1_TURN_WAITING || game->state == CSTATE_P1_TURN_CAPTURING) {
+        player = CHECKERS_PLAYER_ONE;
+        enemy = CHECKERS_PLAYER_TWO;
+        nextPlayer = CSTATE_P2_TURN;
+        nextCapturing = CSTATE_P1_TURN_CAPTURING;
+    } else if (game->state == CSTATE_P2_TURN || game->state == CSTATE_P2_TURN_WAITING || game->state == CSTATE_P2_TURN_CAPTURING) {
+        player = CHECKERS_PLAYER_TWO;
+        enemy = CHECKERS_PLAYER_ONE;
+        nextPlayer = CSTATE_P1_TURN;
+        nextCapturing = CSTATE_P2_TURN_CAPTURING;
+    } else {
+        return 0;
+    }
+    int ret = 0;
+    /* TODO - handle longest capture sequences */
+    if (
+        checkersPlayerMustCapture(game) ||
+        game->flags.currentlyCapturing
+    ) {
+        game->flags.needsUpdate = 0;
+        game->state = nextCapturing;
+        game->flags.currentlyCapturing = 1;
+        Board future = {0};
+        deepcopy(&game->checkersBoard, &future);
+        ret = boardTryMoveOrCapture(&future, player, from, to);
+        if (ret == CHECKERS_CAPTURE_SUCCESS) {
+            boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
+            if (!boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) { /* end turn */
+                // game->state = nextPlayer;
+                // game->flags.currentlyCapturing = 0;
+                game->flags.needsUpdate = 1;
+            }
+        }
+        boardFreeInternalBoard(&future);
+    } else {
+        /* TODO - finish this part */
+        ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
+        if (ret == CHECKERS_CAPTURE_SUCCESS) {
+            if (boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) {
+                game->state = nextCapturing;
+                game->flags.currentlyCapturing = 1;
+                game->flags.needsUpdate = 0;
+            } else {
+                game->flags.needsUpdate = 1;
+            }
+        } else if (ret == CHECKERS_MOVE_SUCCESS) {
+            game->flags.needsUpdate = 1;
+        } else {
+            game->flags.needsUpdate = 0;
+        }
+    }
+    checkersEndTurn(game);
+    if (boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_ONE) == 0 || !boardCheckIfPlayerHasAvailableMoves(&game->checkersBoard, CHECKERS_PLAYER_ONE)) {
+        game->state = CSTATE_END_P2_WIN;
+        game->flags.run = 0;
+    } else if (boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_TWO) == 0 || !boardCheckIfPlayerHasAvailableMoves(&game->checkersBoard, CHECKERS_PLAYER_TWO)) {
+        game->state = CSTATE_END_P1_WIN;
+        game->flags.run = 0;
+    } else if (!boardCheckIfPlayerHasAvailableMoves(&game->checkersBoard, CHECKERS_PLAYER_ONE) && !boardCheckIfPlayerHasAvailableMoves(&game->checkersBoard, CHECKERS_PLAYER_TWO)) {
+        game->state = CSTATE_END_DRAW;
+        game->flags.run = 0;
+        /* TODO - handle other DRAW cases */
+    }
+    return ret;
+}
+
+int checkersMakeMoveP(Checkers* game, Point from, Point to) {
+    if (!validField(from.x, from.y) || !validField(to.x, to.y)) {
+        return CHECKERS_INVALID_MOVE;
+    }
+    return checkersMakeMove(game, POINT_TO_IDX(from.x, from.y), POINT_TO_IDX(to.x, to.y));
+}
+
+/**
+ * Should be called after checkersMakeMove() to ensure
+ * that the board is updated. This may be called by that same function
+ * This serves to prematurely end a turn in cases where
+ * jumps are optional (when and in what circumstances that
+ * happens exactly is up to whoever implements the UI (me)).
  * 
+ * The flag needsUpdate must be set first.
+ */
+void checkersEndTurn(Checkers* game) {
+    /* TODO - consider where to handle state changes */
+    if (game && game->flags.run && game->flags.needsUpdate) {
+        game->turnsTotal += 1;
+        int player = checkersGetCurrentPlayer(game);
+        if (player == CHECKERS_PLAYER_ONE) {
+            game->state = CSTATE_P2_TURN;
+        } else {
+            game->state = CSTATE_P1_TURN;
+        }
+        game->flags.currentlyCapturing = 0;
+        game->flags.needsUpdate = 0;
+        boardUpdate(&game->checkersBoard);
+    }
+}
+
+int checkersGetCurrentPlayer(const Checkers* game) {
+    if (!game || !game->flags.run) {
+        return -1;
+    }
+    if (game->state == CSTATE_P1_TURN || game->state == CSTATE_P1_TURN_WAITING || game->state == CSTATE_P1_TURN_CAPTURING) {
+        return CHECKERS_PLAYER_ONE;
+    } else if (game->state == CSTATE_P2_TURN || game->state == CSTATE_P2_TURN_WAITING || game->state == CSTATE_P2_TURN_CAPTURING) {
+        return CHECKERS_PLAYER_TWO;
+    } else {
+        return -1; 
+    }
+}
+
+int checkersGetCurrentEnemy(const Checkers* game) {
+    int player = checkersGetCurrentPlayer(game);
+    if (player == -1) {
+        return -1;
+    }
+    if (player == CHECKERS_PLAYER_ONE) {
+        return CHECKERS_PLAYER_TWO;
+    } else {
+        return CHECKERS_PLAYER_ONE;
+    }
+}
+
+int checkersGetWinner(const Checkers* game) {
+    if (!game || !game->flags.run) {
+        return -1;
+    }
+    if (game->state == CSTATE_END_P1_WIN) {
+        return CHECKERS_PLAYER_ONE;
+    } else if (game->state == CSTATE_END_P2_WIN) {
+        return CHECKERS_PLAYER_TWO;
+    } else {
+        return -1;
+    }
+}
+
+int checkersIsRunning(const Checkers* game) {
+    if (game) {
+        return game->flags.run != 0;
+    }
+    return 0;
+}
+
+Moves* checkersGetAvailableMovesForPlayer(const Checkers* game, size_t* out_size) {
+    if (!game || !game->flags.run || !out_size) {
+        if (out_size) {
+            *out_size = 0;
+        }
+        return NULL;
+    }
+    int player = checkersGetCurrentPlayer(game);
+    return boardGetAvailableMovesForPlayer(&game->checkersBoard, player, out_size);
+}
+
+size_t checkersGetLongestCaptureStreakForPlayer(const Checkers* game, int** out) {
+    if (!game || !out) {
+        if (out) {
+            *out = NULL;
+        }
+        return 0;
+    }
+    int player = checkersGetCurrentPlayer(game);
+    return boardGetLongestCaptureStreakForPlayer(&game->checkersBoard, player, out);
+}
+
+int checkersPlayerCanMove(const Checkers* game) {
+    if (!game || !game->flags.run) {
+        return 0;
+    }
+    int player = checkersGetCurrentPlayer(game);
+    return boardCheckIfPlayerHasAvailableMoves(&game->checkersBoard, player);
+}
+
+/* if mandatory jumps are disabled, this will always return false */
+int checkersPlayerMustCapture(const Checkers* game) {
+    if (!game || !game->flags.run) {
+        return 0;
+    }
+    int player = checkersGetCurrentPlayer(game);
+    return !game->flags.forceCapture ?
+        0 :
+            boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece) ||
+            boardCheckIfPlayerCanCapture(&game->checkersBoard, player);
+}
+
+void checkersPrint(const Checkers* game) {
+    if (game) {
+        printf(BWHT "Light pieces:" CRESET " %02d\n", boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_LIGHT));
+        printf(BLK "Dark pieces:" CRESET " %02d\n", boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_DARK));
+        for (int i = 0; i < CHECKERS_BOARD_SIZE; i++) {
+            printf("%d  ", CHECKERS_BOARD_SIZE - 1 - i);
+            for (int j = 0; j < CHECKERS_BOARD_SIZE; j++) {
+                int point = POINT_TO_IDX(j, i);
+                if (validField(j, i) && isPiece(game->checkersBoard.board + point)) {
+                    if (isLight(game->checkersBoard.board + point)) {
+                        printf(BWHT "%c " CRESET, pieceChars[game->checkersBoard.board[point].type]);
+                    } else {
+                        printf(BLK "%c " CRESET, pieceChars[game->checkersBoard.board[point].type]);
+                    }
+                } else {
+                    printf("%c ", pieceChars[PIECE_EMPTY_FIELD]);
+                }
+            }
+            printf("\n");
+        }
+        printf("   ");
+        for (int i = 0; i < CHECKERS_BOARD_SIZE; i++) {
+            printf("%c ", 'A' + i);
+        }
+
+        char* color = "";
+        int player = checkersGetCurrentPlayer(game);
+        if (player == CHECKERS_PLAYER_ONE) {
+            color = BWHT;
+        } else if (player == CHECKERS_PLAYER_TWO) {
+            color = BLK;
+        }
+    
+        printf("%sTurn: %d%s\n", color, game->turnsTotal, CRESET);
+    }
+}
+
+/**
  * 
- * 
- * 
- * 
- * 
- * 
- * 
- * 
+ * ##### #   # ##### ####  ##### #####
+ * #      # #    #   #   # #   # #
+ * #####   #     #   ####  ##### #####
+ * #      # #    #   #  #  #   #     #
+ * ##### #   #   #   #   # #   # #####
+ * Extras
  */
 
 /* this assumes that every argument is valid */
