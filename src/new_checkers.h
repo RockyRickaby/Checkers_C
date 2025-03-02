@@ -4,6 +4,7 @@
 #define CHECKERS_PLAYER_ONE          0
 #define CHECKERS_PLAYER_TWO          1
 
+/* so far, these can be safely inverted if so desired */
 #define CHECKERS_PLAYER_LIGHT        CHECKERS_PLAYER_ONE
 #define CHECKERS_PLAYER_DARK         CHECKERS_PLAYER_TWO
 
@@ -21,7 +22,8 @@
 #define CHECKERS_NOT_A_PIECE        -5
 #define CHECKERS_DEAD_PIECE         -6
 #define CHECKERS_ONGOING_TURN       -7
-#define CHECKERS_END_GAME           -8
+#define CHECKERS_NOT_LONGEST_PATH   -8
+#define CHECKERS_END_GAME           -9
 // =======================================================================
 #define V_DIRECTION(from, to)       ((int) roundf((float) ((from) - (to)) / (float) CHECKERS_PIECES_PER_LINE))
 #define H_DIRECTION(from, to)       ((from) - (to))
@@ -98,11 +100,17 @@ typedef struct Checkers {
         uint8_t currentlyCapturing;
         uint8_t needsUpdate;
         uint8_t forceCapture;
-        
+
         /* external use */
         uint8_t autoCapture;
         uint8_t aiEnabled; /* does nothing for now... */
+        uint8_t externalCaptureHandling;
     } flags;
+
+    /* extra stuff for handling longest capture sequences */
+    int* captures;
+    size_t capturesSize;
+    size_t capturesIdx;
 } Checkers;
 
 typedef struct Moves {
@@ -119,13 +127,13 @@ int boardRemainingPiecesTotal(const Board* gameboard);
 int boardRemainingPiecesPlayer(const Board* gameboard, int player);
 int boardUpdate(Board* gameboard); /* called at the end of a player's turn. used to remove from the board the pieces captured during a turn and to turn pieces into kings */
 
-struct Piece boardGetPieceAt(const Board* gameboard, int pos);
-struct Piece boardGetPieceAtP(const Board* gameboard, Point pos);
+Piece boardGetPieceAt(const Board* gameboard, int pos);
+Piece boardGetPieceAtP(const Board* gameboard, Point pos);
 size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int** out);
 Moves* boardGetAvailableMovesForPlayer(const Board* gameboard, int player, size_t* out_size);
 size_t boardGetLongestCaptureStreakForPiece(const Board* gameboard, int piecePos, int** out);
 size_t boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player, int** out);
-void boardDestroyMovesList(struct Moves* moves, size_t moves_size);
+void boardDestroyMovesList(Moves* moves, size_t moves_size);
 
 int boardCheckIfPieceHasAvailableMoves(const Board* gameboard, int pos);
 int boardCheckIfPlayerHasAvailableMoves(const Board* gameboard, int player);
@@ -136,8 +144,7 @@ void boardFreeInternalBoard(Board* gameboard);
 
 // ------------------------------------------------------------
 
-// TODO - finish this
-int checkersInit(Checkers* game, int forceCapture, int autocapture, int enableAi);
+int checkersInit(Checkers* game, int forceCapture, int autocapture, int enableAi, int externalCaptureHandling);
 int checkersFreeBoard(Checkers* game);
 int checkersMakeMove(Checkers* game, int from, int to);
 int checkersMakeMoveP(Checkers* game, Point from, Point to);

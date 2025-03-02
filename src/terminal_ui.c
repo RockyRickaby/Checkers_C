@@ -95,44 +95,8 @@ void terminalCheckersBeginF(Checkers* game, FILE* stepsfile) {
     // checkersAiKill(ai);
 }
 
-static size_t capturesIdx = 0;
-static size_t capturesSize = 0;
-static int* captures = NULL;
 static void handleMove(Checkers* game, Point orig, Point dest) {
-    int status = 0;
-    if (checkersPlayerMustCapture(game)) {
-        if (capturesSize == 0) {
-            capturesSize = checkersGetLongestCaptureStreakForPlayer(game, &captures);
-            capturesIdx = 0;
-        }
-        if (capturesSize == 2) { /* a single move leads to a capture */
-            free(captures);
-            captures = NULL;
-            capturesSize = 0;
-            capturesIdx = 0;
-            status = checkersMakeMoveP(game, orig, dest);
-        } else if (captures[capturesIdx] == POINT_TO_IDX(orig.x, orig.y) && captures[capturesIdx + 1] == POINT_TO_IDX(dest.x, dest.y)) {
-            if (game->flags.autoCapture) {
-                for (size_t i = 0; i < capturesSize - 1; i++) {
-                   status = checkersMakeMove(game, captures[i], captures[i + 1]);
-                }
-                capturesIdx = capturesSize;
-            } else {
-                status = checkersMakeMoveP(game, orig, dest);
-                capturesIdx += 1;
-            }
-            if (capturesIdx >= capturesSize - 1) {
-                free(captures);
-                captures = NULL;
-                capturesSize = 0;
-                capturesIdx = 0;
-            }
-        } else {
-            status = CHECKERS_MOVE_FAIL;
-        }
-    } else {
-        status = checkersMakeMoveP(game, orig, dest);
-    }
+    int status = checkersMakeMoveP(game, orig, dest);
     switch (status) {
         case CHECKERS_CAPTURE_SUCCESS: printf("successful capture!\n\n"); break;
         case CHECKERS_MOVE_SUCCESS:    printf("successful move!\n\n"); break;

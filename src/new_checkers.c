@@ -7,9 +7,9 @@
 #include <math.h>
 #include <errno.h>
 
-#define BLK "\e[0;30m"
-#define BWHT "\e[1;37m"
-#define CRESET "\e[0m"
+#define BLK "\x1b[0;30m"
+#define BWHT "\x1b[1;37m"
+#define CRESET "\x1b[0m"
 
 typedef struct Node {
     struct Node* next;
@@ -213,14 +213,14 @@ int boardUpdate(Board* gameboard) {
     return 0;
 }
 
-struct Piece boardGetPieceAt(const Board* gameboard, int pos) {
+Piece boardGetPieceAt(const Board* gameboard, int pos) {
     if (!gameboard || !validPos(pos)) {
         return emptyField;
     }
     return gameboard->board[pos];
 }
 
-struct Piece boardGetPieceAtP(const Board* gameboard, Point piecePos) {
+Piece boardGetPieceAtP(const Board* gameboard, Point piecePos) {
     if (!gameboard || !validField(piecePos.x, piecePos.y)) {
         return emptyField;
     }
@@ -473,7 +473,7 @@ size_t boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player,
     return size;
 }
 
-void boardDestroyMovesList(struct Moves* moves, size_t moves_size) {
+void boardDestroyMovesList(Moves* moves, size_t moves_size) {
     for (size_t i = 0; i < moves_size; i++) {
         free(moves[i].to);
         moves[i].to = NULL;
@@ -622,7 +622,7 @@ void boardFreeInternalBoard(Board* gameboard) {
  * Checkers implementation
  */
 
-int checkersInit(Checkers* game, int forceCapture, int autocapture, int enableAi) {
+int checkersInit(Checkers* game, int forceCapture, int autocapture, int enableAi, int externalCaptureHandling) {
     if (!game) {
         return 0;
     }
@@ -630,10 +630,14 @@ int checkersInit(Checkers* game, int forceCapture, int autocapture, int enableAi
     boardInit(&game->checkersBoard);
     game->turnsTotal = 0;
     game->state = CSTATE_P1_TURN;
+    game->captures = NULL;
+    game->capturesSize = 0;
+    game->capturesIdx = 0;
 
     game->flags.aiEnabled    =  enableAi ? 1 : 0;
     game->flags.autoCapture  =  autocapture ? 1 : 0;
     game->flags.forceCapture =  forceCapture ? 1 : 0;
+    game->flags.externalCaptureHandling = externalCaptureHandling ? 1 : 0;
 
     game->flags.run = 1;
     game->flags.needsUpdate = 0;
@@ -684,7 +688,6 @@ int checkersMakeMove(Checkers* game, int from, int to) {
         return 0;
     }
     int ret = 0;
-    /* TODO - handle longest capture sequences */
     if (
         checkersPlayerMustCapture(game) ||
         game->flags.currentlyCapturing
@@ -692,20 +695,62 @@ int checkersMakeMove(Checkers* game, int from, int to) {
         game->flags.needsUpdate = 0;
         game->state = nextCapturing;
         game->flags.currentlyCapturing = 1;
+
         Board future = {0};
         deepcopy(&game->checkersBoard, &future);
         ret = boardTryMoveOrCapture(&future, player, from, to);
+        boardFreeInternalBoard(&future); /* never to be used after this... */
         if (ret == CHECKERS_CAPTURE_SUCCESS) {
-            boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
-            if (!boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) { /* end turn */
-                // game->state = nextPlayer;
-                // game->flags.currentlyCapturing = 0;
-                game->flags.needsUpdate = 1;
+            if (!game->flags.externalCaptureHandling && game->flags.forceCapture) {
+                if (game->capturesSize == 0) {
+                    game->capturesSize = checkersGetLongestCaptureStreakForPlayer(game, &game->captures);
+                    game->capturesIdx = 0;
+                }
+                /**
+                 * the longest capture sequence leads to the capture
+                 * of a single piece, so any move will be valid as long
+                 * as it leads to a capture, which was already confirmed
+                 * to be the case when we get to this point
+                 */
+                if (game->capturesSize == 2) {
+                    free(game->captures);
+                    game->captures = NULL;
+                    game->capturesSize = 0;
+                    game->capturesIdx = 0;
+                    ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
+                    if (!boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) {
+                        game->flags.needsUpdate = 1;
+                    }
+                } else if (game->captures[game->capturesIdx] == from && game->captures[game->capturesIdx + 1] == to) {
+                    if (game->flags.autoCapture) {
+                        for (size_t i = 0; i < game->capturesSize - 1; i++) {
+                           ret = boardTryMoveOrCapture(&game->checkersBoard, player, game->captures[i], game->captures[i + 1]);
+                        }
+                        game->flags.needsUpdate = 1;
+                        game->capturesIdx = game->capturesSize;
+                    } else {
+                        ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
+                        game->capturesIdx += 1;
+                    }
+                    if (game->capturesIdx >= game->capturesSize - 1) {
+                        free(game->captures);
+                        game->captures = NULL;
+                        game->capturesSize = 0;
+                        game->capturesIdx = 0;
+                    }
+                } else {
+                    ret = CHECKERS_NOT_LONGEST_PATH;
+                }
+            } else {
+                ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
+                if (!boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) {
+                    game->flags.needsUpdate = 1;
+                }
             }
+        } else {
+            ret = CHECKERS_MOVE_FAIL;
         }
-        boardFreeInternalBoard(&future);
     } else {
-        /* TODO - finish this part */
         ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
         if (ret == CHECKERS_CAPTURE_SUCCESS) {
             if (boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) {
@@ -744,16 +789,16 @@ int checkersMakeMoveP(Checkers* game, Point from, Point to) {
 }
 
 /**
- * Should be called after checkersMakeMove() to ensure
- * that the board is updated. This may be called by that same function
- * This serves to prematurely end a turn in cases where
+ * When called, this function should be called after checkersMakeMove().
+ * This function may be called by that same function
+ * This function serves to prematurely end a turn in cases where
  * jumps are optional (when and in what circumstances that
- * happens exactly is up to whoever implements the UI (me)).
+ * happens exactly is up to whoever implements the UI (me!)).
  * 
  * The flag needsUpdate must be set first.
  */
 void checkersEndTurn(Checkers* game) {
-    /* TODO - consider where to handle state changes */
+    /* it is perfectly possible to just totally skip a player's turn if so desired... */
     if (game && game->flags.run && game->flags.needsUpdate) {
         game->turnsTotal += 1;
         int player = checkersGetCurrentPlayer(game);
@@ -855,6 +900,7 @@ int checkersPlayerMustCapture(const Checkers* game) {
             boardCheckIfPlayerCanCapture(&game->checkersBoard, player);
 }
 
+/* TODO - maybe consider using ANSI escape codes to render this thing? */
 void checkersPrint(const Checkers* game) {
     if (game) {
         printf(BWHT "Light pieces:" CRESET " %02d\n", boardRemainingPiecesPlayer(&game->checkersBoard, CHECKERS_PLAYER_LIGHT));
@@ -882,9 +928,9 @@ void checkersPrint(const Checkers* game) {
 
         char* color = "";
         int player = checkersGetCurrentPlayer(game);
-        if (player == CHECKERS_PLAYER_ONE) {
+        if (player == CHECKERS_PLAYER_LIGHT) {
             color = BWHT;
-        } else if (player == CHECKERS_PLAYER_TWO) {
+        } else if (player == CHECKERS_PLAYER_DARK) {
             color = BLK;
         }
     
@@ -1105,6 +1151,7 @@ static int longestCaptureForMan(const Board* gameboard, int player, int piecePos
                     boardFreeInternalBoard(&future);
                     continue;
                 }
+                /* TODO - consider _not_ doing this */
                 /* push move to stack */
                 Node t = { /* this will be lost once we leave the context */
                     .next = stack->top,
@@ -1140,7 +1187,6 @@ static int longestCaptureForMan(const Board* gameboard, int player, int piecePos
 }
 
 static int longestCaptureForKing(const Board* gameboard, int player, int piecePos, int** out, size_t* size, CaptureStack* stack) {
-    /* TODO - finish this. This will not be easy I believe... */
     int m = IS_EVEN_LINE(piecePos) ? 1 : -1;
     Point fromP = IDX_TO_POINT(piecePos);
 
@@ -1211,7 +1257,6 @@ static int longestCaptureForKing(const Board* gameboard, int player, int piecePo
                     break;
                 }
             } else if (capturingMove) {
-                /* TODO */
                 Point destP = toP;
                 int dest = to;
                 Board future = {0};
