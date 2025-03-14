@@ -9,10 +9,10 @@ set libdir=lib
 if not exist %libdir%\libraylib.a goto exec
 if not exist %libdir%\libraylibdll.a goto exec
 if not exist %libdir%\raylib.dll goto exec
-if not exist %includedir%\external\rprand.h goto exec
 if not exist %includedir%\raylib.h goto exec
 if not exist %includedir%\raymath.h goto exec
 if not exist %includedir%\rlgl.h goto exec
+if not exist %includedir%\external\rprand.h goto exec
 goto done
 
 :exec
@@ -41,7 +41,7 @@ tar -xvf %tmp%\%raylibzip% -C %tmp%
 move %tmp%\%raylib%\lib\* %libdir%
 move %tmp%\%raylib%\include\*.h %includedir%
 
-md %includedir%\external
+if not exist %includedir%\external md %includedir%\external
 move %tmp%\rprand.h %includedir%\external
 
  :: delete %tmp% folder and everything inside it
