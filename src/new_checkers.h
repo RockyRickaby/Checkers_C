@@ -36,17 +36,18 @@
  * A valid point is one such that (x + y) % 2 == 1
  */
 #define POINT_TO_IDX(x,y)           ((y) * CHECKERS_PIECES_PER_LINE + (x) / 2)
-#define IDX_TO_POINT(idx)                                                               \
-(                                                                                       \
-    (struct Point) {                                                                    \
-        .x = IS_EVEN_LINE((idx)) ?                                                      \
-                ((idx) % CHECKERS_PIECES_PER_LINE + 1) * 2 - 1 :                        \
-                    ((idx) % CHECKERS_PIECES_PER_LINE) * 2,                             \
-        .y = (idx) / CHECKERS_PIECES_PER_LINE                                           \
-    }                                                                                   \
+#define IDX_TO_POINT(idx)\
+(\
+    (struct Point) {\
+        .x = IS_EVEN_LINE((idx)) ?\
+                ((idx) % CHECKERS_PIECES_PER_LINE + 1) * 2 - 1 :\
+                    ((idx) % CHECKERS_PIECES_PER_LINE) * 2,\
+        .y = (idx) / CHECKERS_PIECES_PER_LINE\
+    }\
 )
 
 #include <stdint.h>
+#include <stddef.h>
 #include <math.h>
 
 typedef struct Point { int x, y; } Point;
@@ -122,6 +123,8 @@ typedef struct Moves {
 
 
 int boardInit(Board* gameboard);
+int boardReinit(Board* gameboard);
+void boardFreeInternalBoard(Board* gameboard);
 int boardTryMoveOrCapture(Board* gameboard, int player, int from, int to);
 int boardRemainingPiecesTotal(const Board* gameboard);
 int boardRemainingPiecesPlayer(const Board* gameboard, int player);
@@ -140,11 +143,11 @@ int boardCheckIfPlayerHasAvailableMoves(const Board* gameboard, int player);
 int boardCheckIfPieceCanCapture(const Board* gameboard, int pos);
 int boardCheckIfPlayerCanCapture(const Board* gameboard, int player);
 void boardPrint(const Board* gameboard);
-void boardFreeInternalBoard(Board* gameboard);
 
 // ------------------------------------------------------------
 
 int checkersInit(Checkers* game, int forceCapture, int autocapture, int enableAi, int externalCaptureHandling);
+int checkersReinit(Checkers* gameboard);
 int checkersFreeBoard(Checkers* game);
 int checkersMakeMove(Checkers* game, int from, int to);
 int checkersMakeMoveP(Checkers* game, Point from, Point to);
@@ -152,10 +155,36 @@ void checkersEndTurn(Checkers* game);
 int checkersGetCurrentPlayer(const Checkers* game);
 int checkersGetCurrentEnemy(const Checkers* game);
 int checkersGetWinner(const Checkers* game);
-int checkersIsRunning(const Checkers* game);
+
+int checkersFlagIsRunning(const Checkers* game);
+int checkersFlagIsCurrentlyCapturing(const Checkers* game);
+int checkersFlagForceCaptureIsOn(const Checkers* game);
+int checkersFlagAutoCapturesIsOn(const Checkers* game);
+int checkersFlagIsAIEnabled(const Checkers* game);
+int checkersFlagIsExternalCaptureHandleEnabled(const Checkers* game);
+
+int checkersFlagForceCaptureSet(Checkers* game, int on);
+int checkersFlagAutoCapturesSet(Checkers* game, int on);
+int checkersFlagAISet(Checkers* game, int on);
+
+int checkersFlagNeedsUpdateSet(Checkers* game);
 
 Moves* checkersGetAvailableMovesForPlayer(const Checkers* game, size_t* out_size);
 size_t checkersGetLongestCaptureStreakForPlayer(const Checkers* game, int** out);
+/**
+ * nothing is loaded if captures are not mandatory
+ * 
+ * returns 0 when nothing is loaded
+ * returns 1 when something is loaded and -1 on error
+ */
+int checkersLoadCaptureStreak(Checkers* game);
+/**
+ * just frees the internal capture streak list
+ * 
+ * returns 0 if nothing needs to be done
+ * returns 1 if the list has been freed and -1 on error
+ */
+int checkersUnloadCaptureStreak(Checkers* game);
 
 int checkersPlayerCanMove(const Checkers* game);
 int checkersPlayerMustCapture(const Checkers* game);

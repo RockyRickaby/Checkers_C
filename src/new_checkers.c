@@ -95,12 +95,12 @@ int boardInit(Board* gameboard) {
     gameboard->boardSize = bsize;
     gameboard->recentlyMovedPiece = -1;
     
-    Piece darkman = {
+    const Piece darkman = {
         .alive = 1,
         .type = PIECE_DARK_MAN,
         .recentlyMoved = 0,
     };
-    Piece lightman = {
+    const Piece lightman = {
         .alive = 1,
         .type = PIECE_LIGHT_MAN,
         .recentlyMoved = 0,
@@ -125,7 +125,27 @@ int boardInit(Board* gameboard) {
     return 1;
 }
 
-/* only the same piece can be moved per turn */
+int boardReinit(Board* gameboard) {
+    boardFreeInternalBoard(gameboard);
+    return boardInit(gameboard);
+}
+
+void boardFreeInternalBoard(Board* gameboard) {
+    if (gameboard) {
+        free(gameboard->board);
+        memset(gameboard, 0, sizeof(Board));
+        gameboard->board = NULL; /* prevent use after free */
+    }
+}
+
+/**
+ * only the same piece can be moved per turn
+ * 
+ * Return values:
+ * ret < 0 = ERROR VALUES
+ * ret > 0 = SUCCESS VALUES
+ * ret == 0 = ABSOLUTELY NOTHING HAS HAPPENED
+ */
 int boardTryMoveOrCapture(Board* gameboard, int player, int from, int to) {
     if (!gameboard) {
         return CHECKERS_NULL_BOARD;
@@ -457,15 +477,11 @@ size_t boardGetLongestCaptureStreakForPlayer(const Board* gameboard, int player,
             int* tmp = NULL;
             size_t tmpsize = boardGetLongestCaptureStreakForPiece(gameboard, i, &tmp);
             if (tmpsize > size) {
-                if (buf) {
-                    free(buf);
-                }
+                free(buf);
                 buf = tmp;
                 size = tmpsize;
             } else {
-                if (tmp) {
-                    free(tmp);
-                }
+                free(tmp);
             }
         }
     }
@@ -604,14 +620,6 @@ void boardPrint(const Board* gameboard) {
     }
 }
 
-void boardFreeInternalBoard(Board* gameboard) {
-    if (gameboard) {
-        free(gameboard->board);
-        memset(gameboard, 0, sizeof(Board));
-        gameboard->board = NULL; /* prevent use after free */
-    }
-}
-
 /**
  *
  * ##### #   # ##### ##### #   # ##### ####  #####
@@ -645,9 +653,21 @@ int checkersInit(Checkers* game, int forceCapture, int autocapture, int enableAi
     return 1;
 }
 
+int checkersReinit(Checkers* game) {
+    if (game) {
+        int fc = game->flags.forceCapture,
+            ac = game->flags.autoCapture,
+            eai = game->flags.aiEnabled,
+            exch = game->flags.externalCaptureHandling;
+        return checkersFreeBoard(game) && checkersInit(game, fc, ac, eai, exch);
+    }
+    return 0;
+}
+
 int checkersFreeBoard(Checkers* game) {
     if (game) {
         boardFreeInternalBoard(&game->checkersBoard);
+        checkersUnloadCaptureStreak(game);
         memset(game, 0, sizeof(Checkers));
         return 1;
     }
@@ -670,19 +690,11 @@ int checkersMakeMove(Checkers* game, int from, int to) {
     if (!validPos(from) || !validPos(to)) {
         return CHECKERS_INVALID_MOVE;
     }
-    int enemy = -1;
-    int player = -1;
-    GameState nextPlayer = {0};
+    int player = checkersGetCurrentPlayer(game);
     GameState nextCapturing = {0};
-    if (game->state == CSTATE_P1_TURN || game->state == CSTATE_P1_TURN_WAITING || game->state == CSTATE_P1_TURN_CAPTURING) {
-        player = CHECKERS_PLAYER_ONE;
-        enemy = CHECKERS_PLAYER_TWO;
-        nextPlayer = CSTATE_P2_TURN;
+    if (player == CHECKERS_PLAYER_ONE) {
         nextCapturing = CSTATE_P1_TURN_CAPTURING;
-    } else if (game->state == CSTATE_P2_TURN || game->state == CSTATE_P2_TURN_WAITING || game->state == CSTATE_P2_TURN_CAPTURING) {
-        player = CHECKERS_PLAYER_TWO;
-        enemy = CHECKERS_PLAYER_ONE;
-        nextPlayer = CSTATE_P1_TURN;
+    } else if (player == CHECKERS_PLAYER_TWO) {
         nextCapturing = CSTATE_P2_TURN_CAPTURING;
     } else {
         return 0;
@@ -730,7 +742,9 @@ int checkersMakeMove(Checkers* game, int from, int to) {
                         game->capturesIdx = game->capturesSize;
                     } else {
                         ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
-                        game->capturesIdx += 1;
+                        if (ret == CHECKERS_CAPTURE_SUCCESS) {
+                            game->capturesIdx += 1;
+                        }
                     }
                     if (game->capturesIdx >= game->capturesSize - 1) {
                         free(game->captures);
@@ -851,12 +865,77 @@ int checkersGetWinner(const Checkers* game) {
     }
 }
 
-int checkersIsRunning(const Checkers* game) {
+int checkersFlagIsRunning(const Checkers* game) {
     if (game) {
         return game->flags.run != 0;
     }
     return 0;
 }
+
+int checkersFlagIsCurrentlyCapturing(const Checkers* game) {
+    if (game) {
+        return game->flags.currentlyCapturing != 0;
+    }
+    return 0;
+}
+
+int checkersFlagForceCaptureIsOn(const Checkers* game) {
+    if (game) {
+        return game->flags.forceCapture != 0;
+    }
+    return 0;
+}
+
+int checkersFlagAutoCapturesIsOn(const Checkers* game) {
+    if (game) {
+        return game->flags.autoCapture != 0;
+    }
+    return 0;
+}
+
+int checkersFlagIsAIEnabled(const Checkers* game) {
+    if (game) {
+        return game->flags.aiEnabled != 0;
+    }
+    return 0;
+}
+
+int checkersFlagIsExternalCaptureHandleEnabled(const Checkers* game) {
+    if (game) {
+        return game->flags.externalCaptureHandling != 0;
+    }
+    return 0;
+}
+
+int checkersFlagForceCaptureSet(Checkers* game, int on) {
+    if (game) {
+        return (game->flags.forceCapture = on) != 0;
+    }
+    return 0;
+}
+
+int checkersFlagAutoCapturesSet(Checkers* game, int on) {
+    if (game) {
+        return (game->flags.autoCapture = on) != 0;
+    }
+    return 0;
+}
+
+int checkersFlagAISet(Checkers* game, int on) {
+    if (game) {
+        return (game->flags.aiEnabled = on) != 0;
+    }
+    return 0;
+}
+
+
+int checkersFlagNeedsUpdateSet(Checkers* game) {
+    if (game) {
+        return (game->flags.needsUpdate = 1) != 0;
+    }
+    return 0;
+}
+
 
 Moves* checkersGetAvailableMovesForPlayer(const Checkers* game, size_t* out_size) {
     if (!game || !game->flags.run || !out_size) {
@@ -878,6 +957,41 @@ size_t checkersGetLongestCaptureStreakForPlayer(const Checkers* game, int** out)
     }
     int player = checkersGetCurrentPlayer(game);
     return boardGetLongestCaptureStreakForPlayer(&game->checkersBoard, player, out);
+}
+
+int checkersLoadCaptureStreak(Checkers* game) {
+    if (!game || !checkersFlagIsRunning(game)) {
+        return -1;
+    }
+    if (game->captures == NULL && checkersFlagForceCaptureIsOn(game)) {
+        game->capturesSize = checkersGetLongestCaptureStreakForPlayer(game, &game->captures);
+        if (game->capturesSize == 0) {
+            game->captures = NULL;
+            return 0;
+        } else if (game->capturesSize == 2) {
+            free(game->captures);
+            game->captures = NULL;
+            game->capturesSize = 0;
+            return 0;
+        }
+        game->capturesIdx = 0;
+        return 1;
+    }
+    return 0;
+}
+
+int checkersUnloadCaptureStreak(Checkers* game) {
+    if (!game) {
+        return -1;
+    }
+    if (game->captures != NULL) {
+        free(game->captures);
+        game->captures = NULL;
+        game->capturesIdx = 0;
+        game->capturesSize = 0;
+        return 1;
+    }
+    return 0;
 }
 
 int checkersPlayerCanMove(const Checkers* game) {
@@ -948,7 +1062,7 @@ void checkersPrint(const Checkers* game) {
  * Extras
  */
 
-/* this assumes that every argument is valid */
+/* this assumes that every argument is valid and that the path is free from obstruction */
 static inline int canCapture(const Board* gameboard, int from, int to, Point toP, Point vec) {
     return (
         isEnemy(gameboard->board + from, gameboard->board + to) && gameboard->board[to].alive &&
@@ -1186,6 +1300,7 @@ static int longestCaptureForMan(const Board* gameboard, int player, int piecePos
     return couldCapture;
 }
 
+/* TODO - check this. longest capture might make kings jump much farther than necessary */
 static int longestCaptureForKing(const Board* gameboard, int player, int piecePos, int** out, size_t* size, CaptureStack* stack) {
     int m = IS_EVEN_LINE(piecePos) ? 1 : -1;
     Point fromP = IDX_TO_POINT(piecePos);
@@ -1270,7 +1385,7 @@ static int longestCaptureForKing(const Board* gameboard, int player, int piecePo
                 };
                 stack->top = &t;
                 stack->size++;
-                if (!longestCaptureForKing(&future, player, dest, out, size, stack)) {
+                if (longestCaptureForKing(&future, player, dest, out, size, stack)) {
                     if (stack->size >= *size) {
                         *size = stack->size;
                         size_t counter = stack->size;
