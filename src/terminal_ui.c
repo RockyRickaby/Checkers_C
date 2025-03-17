@@ -27,14 +27,14 @@ void terminalCheckersBeginF(Checkers* game, FILE* stepsfile) {
     // if (game->flags.aiEnabled) {
     //     ai = checkersAiCreate(game);
     // }
-    while (checkersIsRunning(game)) {
+    while (checkersFlagIsRunning(game)) {
         checkersPrint(game);
         int currPlayer = checkersGetCurrentPlayer(game);
         if (currPlayer == CHECKERS_PLAYER_ONE) {
             printf("Current player: Player one\n");
         } else {
             printf("Current player: Player two\n");
-            // if (game->flags.aiEnabled && ai) {
+            // if (checkersFlagIsAIEnabled(game) && ai) {
             //     printf("Thinking...\n");
             //     struct AiMoves moves = checkersAiGenMovesSync(ai);
             //     if (!moves.valid) {
@@ -54,7 +54,7 @@ void terminalCheckersBeginF(Checkers* game, FILE* stepsfile) {
                 free(move);
                 return;
             }
-            if (!game->flags.forceCapture && game->flags.currentlyCapturing && strcmp("skip", move) == 0) {
+            if (!checkersFlagForceCaptureIsOn(game) && checkersFlagIsCurrentlyCapturing(game) && strcmp("skip", move) == 0) {
                 skip = 1;
                 valid = 1;
             } else if (!validateInput(move)) {
@@ -66,7 +66,8 @@ void terminalCheckersBeginF(Checkers* game, FILE* stepsfile) {
         }
 
         if (skip) {
-            game->flags.needsUpdate = 1;
+            // game->flags.needsUpdate = 1;
+            checkersFlagNeedsUpdateSet(game);
             checkersEndTurn(game);
             continue;
         }
