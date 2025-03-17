@@ -674,6 +674,7 @@ int checkersFreeBoard(Checkers* game) {
     return 0;
 }
 
+static int handleCaptureStreak(Checkers* game, int from, int to);
 /**
  * Return values:
  * ret < 0 = ERROR VALUES
@@ -702,7 +703,7 @@ int checkersMakeMove(Checkers* game, int from, int to) {
     int ret = 0;
     if (
         checkersPlayerMustCapture(game) ||
-        game->flags.currentlyCapturing
+        checkersFlagIsCurrentlyCapturing(game)
     ) {
         game->flags.needsUpdate = 0;
         game->state = nextCapturing;
@@ -714,47 +715,7 @@ int checkersMakeMove(Checkers* game, int from, int to) {
         boardFreeInternalBoard(&future); /* never to be used after this... */
         if (ret == CHECKERS_CAPTURE_SUCCESS) {
             if (!game->flags.externalCaptureHandling && game->flags.forceCapture) {
-                if (game->capturesSize == 0) {
-                    game->capturesSize = checkersGetLongestCaptureStreakForPlayer(game, &game->captures);
-                    game->capturesIdx = 0;
-                }
-                /**
-                 * the longest capture sequence leads to the capture
-                 * of a single piece, so any move will be valid as long
-                 * as it leads to a capture, which was already confirmed
-                 * to be the case when we get to this point
-                 */
-                if (game->capturesSize == 2) {
-                    free(game->captures);
-                    game->captures = NULL;
-                    game->capturesSize = 0;
-                    game->capturesIdx = 0;
-                    ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
-                    if (!boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) {
-                        game->flags.needsUpdate = 1;
-                    }
-                } else if (game->captures[game->capturesIdx] == from && game->captures[game->capturesIdx + 1] == to) {
-                    if (game->flags.autoCapture) {
-                        for (size_t i = 0; i < game->capturesSize - 1; i++) {
-                           ret = boardTryMoveOrCapture(&game->checkersBoard, player, game->captures[i], game->captures[i + 1]);
-                        }
-                        game->flags.needsUpdate = 1;
-                        game->capturesIdx = game->capturesSize;
-                    } else {
-                        ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
-                        if (ret == CHECKERS_CAPTURE_SUCCESS) {
-                            game->capturesIdx += 1;
-                        }
-                    }
-                    if (game->capturesIdx >= game->capturesSize - 1) {
-                        free(game->captures);
-                        game->captures = NULL;
-                        game->capturesSize = 0;
-                        game->capturesIdx = 0;
-                    }
-                } else {
-                    ret = CHECKERS_NOT_LONGEST_PATH;
-                }
+                ret = handleCaptureStreak(game, from, to);
             } else {
                 ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
                 if (!boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) {
@@ -1080,6 +1041,58 @@ static inline int deepcopy(const Board* src, Board* dst) {
     memcpy(dstBoard, src->board, sizeof(Piece) * src->boardSize);
     dst->board = dstBoard;
     return 1;
+}
+
+/**
+ * if forcecapture is on, this ensures that the player is following
+ * the path that leads to the most captures.
+ * 
+ * This WILL set the needsUpdate flag in some circumstances.
+ */
+static int handleCaptureStreak(Checkers* game, int from, int to) {
+    int ret = 0;
+    int player = checkersGetCurrentPlayer(game);
+    if (game->capturesSize == 0) {
+        game->capturesSize = checkersGetLongestCaptureStreakForPlayer(game, &game->captures);
+        game->capturesIdx = 0;
+    }
+    /**
+     * the longest capture sequence leads to the capture
+     * of a single piece, so any move will be valid as long
+     * as it leads to a capture, which was already confirmed
+     * to be the case when we get to this point
+     */
+    if (game->capturesSize == 2) {
+        free(game->captures);
+        game->captures = NULL;
+        game->capturesSize = 0;
+        game->capturesIdx = 0;
+        ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
+        if (!boardCheckIfPieceCanCapture(&game->checkersBoard, game->checkersBoard.recentlyMovedPiece)) {
+            game->flags.needsUpdate = 1;
+        }
+    } else if (game->captures[game->capturesIdx] == from && game->captures[game->capturesIdx + 1] == to) {
+        if (game->flags.autoCapture) {
+            for (size_t i = 0; i < game->capturesSize - 1; i++) {
+               ret = boardTryMoveOrCapture(&game->checkersBoard, player, game->captures[i], game->captures[i + 1]);
+            }
+            game->flags.needsUpdate = 1;
+            game->capturesIdx = game->capturesSize;
+        } else {
+            ret = boardTryMoveOrCapture(&game->checkersBoard, player, from, to);
+            if (ret == CHECKERS_CAPTURE_SUCCESS) {
+                game->capturesIdx += 1;
+            }
+        }
+        if (game->capturesIdx >= game->capturesSize - 1) {
+            free(game->captures);
+            game->captures = NULL;
+            game->capturesSize = 0;
+            game->capturesIdx = 0;
+        }
+    } else {
+        ret = CHECKERS_NOT_LONGEST_PATH;
+    }
 }
 
  /**
