@@ -174,10 +174,10 @@ size_t checkersGetLongestCaptureStreakForPlayer(const Checkers* game, int** out)
 /**
  * Nothing is allocated if captures are not mandatory.
  * Every call to this function should be (eventually)
- * followed by a call to checkersUnloadCaptureStreak() IF something is allocated
+ * followed by a call to checkersUnloadCaptureStreak() IFF something is allocated
  * 
  * returns 0 when nothing is allocated
- * returns 1 when something is allocated and -1 on error
+ * returns 1 when something is allocated and -1 on error (nothing is allocated on error)
  */
 int checkersLoadCaptureStreak(Checkers* game);
 /**
