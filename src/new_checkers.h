@@ -172,12 +172,12 @@ int checkersFlagNeedsUpdateSet(Checkers* game);
 Moves* checkersGetAvailableMovesForPlayer(const Checkers* game, size_t* out_size);
 size_t checkersGetLongestCaptureStreakForPlayer(const Checkers* game, int** out);
 /**
- * Nothing is loaded if captures are not mandatory.
+ * Nothing is allocated if captures are not mandatory.
  * Every call to this function should be (eventually)
- * followed by a call to checkersUnloadCaptureStreak()
+ * followed by a call to checkersUnloadCaptureStreak() IF something is allocated
  * 
- * returns 0 when nothing is loaded
- * returns 1 when something is loaded and -1 on error
+ * returns 0 when nothing is allocated
+ * returns 1 when something is allocated and -1 on error
  */
 int checkersLoadCaptureStreak(Checkers* game);
 /**
