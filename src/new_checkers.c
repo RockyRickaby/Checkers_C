@@ -925,6 +925,7 @@ int checkersLoadCaptureStreak(Checkers* game) {
         return -1;
     }
     if (game->captures == NULL && checkersFlagForceCaptureIsOn(game)) {
+        game->capturesIdx = 0;
         game->capturesSize = checkersGetLongestCaptureStreakForPlayer(game, &game->captures);
         if (game->capturesSize == 0) {
             game->captures = NULL;
@@ -935,7 +936,6 @@ int checkersLoadCaptureStreak(Checkers* game) {
             game->capturesSize = 0;
             return 0;
         }
-        game->capturesIdx = 0;
         return 1;
     }
     return 0;
@@ -953,6 +953,16 @@ int checkersUnloadCaptureStreak(Checkers* game) {
         return 1;
     }
     return 0;
+}
+
+int checkersCaptureStreakNext(Checkers* game) {
+    if (!game || !checkersFlagIsRunning(game)) {
+        return -10;
+    }
+    if (game->captures == NULL || game->capturesIdx >= game->capturesSize) {
+        return -1;
+    }
+    return game->captures[game->capturesIdx++];
 }
 
 int checkersPlayerCanMove(const Checkers* game) {

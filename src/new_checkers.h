@@ -172,7 +172,9 @@ int checkersFlagNeedsUpdateSet(Checkers* game);
 Moves* checkersGetAvailableMovesForPlayer(const Checkers* game, size_t* out_size);
 size_t checkersGetLongestCaptureStreakForPlayer(const Checkers* game, int** out);
 /**
- * nothing is loaded if captures are not mandatory
+ * Nothing is loaded if captures are not mandatory.
+ * Every call to this function should be (eventually)
+ * followed by a call to checkersUnloadCaptureStreak()
  * 
  * returns 0 when nothing is loaded
  * returns 1 when something is loaded and -1 on error
@@ -186,6 +188,17 @@ int checkersLoadCaptureStreak(Checkers* game);
  */
 int checkersUnloadCaptureStreak(Checkers* game);
 
+/**
+ * Works kind of like an iterator. Call it and it returns the
+ * next movement in the list and it will increment an index
+ * (the first movement is always the origin. Use that to
+ * check if the piece chosen by the player is the "right"
+ * one)
+ * 
+ * A return value of -1 means that there are no more moves to check.
+ * Any return value less than -1 means error.
+ */
+int checkersCaptureStreakNext(Checkers* game);
 int checkersPlayerCanMove(const Checkers* game);
 int checkersPlayerMustCapture(const Checkers* game);
 void checkersPrint(const Checkers* game);
