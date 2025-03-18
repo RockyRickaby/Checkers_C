@@ -61,6 +61,11 @@ static inline int isFriend(const Piece* p1, const Piece* p2) { return (isLight(p
 static int fromVecToOffset(Point vec, int from);
 
 static inline int deepcopy(const Board* src, Board* dst);
+/**
+ * This assumes that every argument is valid.
+ * This is also not a thorough check.
+ * Make sure that the path is unobstructed before calling this function.
+ */
 static inline int canCapture(const Board* gameboard, int from, int to, Point toP, Point vec);
 static int movePiece(Board* gameboard, int from, int to);
 static int validMove(Board* gameboard, int player, int from, int to);
@@ -840,14 +845,14 @@ int checkersFlagIsCurrentlyCapturing(const Checkers* game) {
     return 0;
 }
 
-int checkersFlagForceCaptureIsOn(const Checkers* game) {
+int checkersFlagIsForceCaptureOn(const Checkers* game) {
     if (game) {
         return game->flags.forceCapture != 0;
     }
     return 0;
 }
 
-int checkersFlagAutoCapturesIsOn(const Checkers* game) {
+int checkersFlagIsAutoCapturesOn(const Checkers* game) {
     if (game) {
         return game->flags.autoCapture != 0;
     }
@@ -868,21 +873,21 @@ int checkersFlagIsExternalCaptureHandleEnabled(const Checkers* game) {
     return 0;
 }
 
-int checkersFlagForceCaptureSet(Checkers* game, int on) {
+int checkersFlagSetForceCapture(Checkers* game, int on) {
     if (game) {
         return (game->flags.forceCapture = on) != 0;
     }
     return 0;
 }
 
-int checkersFlagAutoCapturesSet(Checkers* game, int on) {
+int checkersFlagSetAutoCaptures(Checkers* game, int on) {
     if (game) {
         return (game->flags.autoCapture = on) != 0;
     }
     return 0;
 }
 
-int checkersFlagAISet(Checkers* game, int on) {
+int checkersFlagSetAI(Checkers* game, int on) {
     if (game) {
         return (game->flags.aiEnabled = on) != 0;
     }
@@ -890,7 +895,7 @@ int checkersFlagAISet(Checkers* game, int on) {
 }
 
 
-int checkersFlagNeedsUpdateSet(Checkers* game) {
+int checkersFlagSetNeedsUpdate(Checkers* game) {
     if (game) {
         return (game->flags.needsUpdate = 1) != 0;
     }
@@ -924,7 +929,7 @@ int checkersLoadCaptureStreak(Checkers* game) {
     if (!game || !checkersFlagIsRunning(game)) {
         return -1;
     }
-    if (game->captures == NULL && checkersFlagForceCaptureIsOn(game)) {
+    if (game->captures == NULL && checkersFlagIsForceCaptureOn(game)) {
         game->capturesIdx = 0;
         game->capturesSize = checkersGetLongestCaptureStreakForPlayer(game, &game->captures);
         if (game->capturesSize == 0) {
@@ -1033,7 +1038,6 @@ void checkersPrint(const Checkers* game) {
  * Extras
  */
 
-/* this assumes that every argument is valid and that the path is free from obstruction */
 static inline int canCapture(const Board* gameboard, int from, int to, Point toP, Point vec) {
     return (
         isEnemy(gameboard->board + from, gameboard->board + to) && gameboard->board[to].alive &&

@@ -54,7 +54,7 @@ void terminalCheckersBeginF(Checkers* game, FILE* stepsfile) {
                 free(move);
                 return;
             }
-            if (!checkersFlagForceCaptureIsOn(game) && checkersFlagIsCurrentlyCapturing(game) && strcmp("skip", move) == 0) {
+            if (!checkersFlagIsForceCaptureOn(game) && checkersFlagIsCurrentlyCapturing(game) && strcmp("skip", move) == 0) {
                 skip = 1;
                 valid = 1;
             } else if (!validateInput(move)) {
@@ -67,7 +67,7 @@ void terminalCheckersBeginF(Checkers* game, FILE* stepsfile) {
 
         if (skip) {
             // game->flags.needsUpdate = 1;
-            checkersFlagNeedsUpdateSet(game);
+            checkersFlagSetNeedsUpdate(game);
             checkersEndTurn(game);
             continue;
         }
