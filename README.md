@@ -30,7 +30,7 @@ or
 ### On Linux
 
 You might want to check out [this link](https://github.com/raysan5/raylib/wiki/Working-on-GNU-Linux#install-on-gnu-linux) to see if there is a
-Raylib package available for your distro. In case there isn't, you should be able to run the following shell script to get the dependencies. Then you'll be able to compile the code with either `make` or `mingw32-make`.
+Raylib package available for your distro. In case there isn't, you should be able to run the following shell script to get the dependencies. Then you'll be able to compile the code with `make`.
 
 ```console
 $ chmod +x ./getdeps.sh             # give it permission to execute
