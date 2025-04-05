@@ -1,5 +1,10 @@
 # Checkers in C using Raylib
 
+> [!NOTE]
+> This reimplementation is currently unfinished. There is no way to play
+> against the computer yet, but playing against a friend should work 
+> just fine.
+
 This was supposed to be just a small little project with a not so accurate implementation of checkers just so I could learn how to use certain Raylib functions, but I guess I got a bit ambitious...
 
 I took some liberties while implementing certain rules (only those related to wins and draws) because I don't think I could've implemented them properly without creating a mess... but I might implement them in the future!

@@ -4,43 +4,96 @@
 #include <stddef.h>
 
 // #include "checkers.h"
-// #include "terminal_ui.h"
-// #include "gui.h"
+#include "terminal_ui.h"
+#include "gui.h"
 
 #include "new_checkers.h"
 
 int main(int argc, char const *argv[]) {
     struct Checkers game;
-    checkersInit(&game, 0, 1, 1);
-    printf("%d\n", checkersMakeMove(&game, 30, 26));
-    printf("%d\n", checkersMakeMove(&game, 16, 20));
-    printf("%d\n", checkersMakeMove(&game, 26, 21));
-    printf("%d\n", checkersMakeMove(&game, 17, 26));
-    printf("%d\n", checkersMakeMove(&game, 36, 30));
-    printf("%d\n", checkersMakeMove(&game, 12, 17));
+    // checkersInit(&game, 1, 1, 1, 0);
+    // terminalCheckersBeginF(&game, stdin);
 
-    printf("%d\n", checkersMakeMove(&game, 34, 29));
-    printf("%d\n", checkersMakeMove(&game, 18, 23));
-    printf("%d\n", checkersMakeMove(&game, 32, 27));
-    printf("%d\n", checkersMakeMove(&game, 23, 34));
-    printf("%d\n", checkersMakeMove(&game, 27, 22));
-    printf("%d\n", checkersMakeMove(&game, 13, 18));
-    printf("%d\n", checkersMakeMove(&game, 30, 25));
-    printf("%d\n", checkersMakeMove(&game, 18, 27));
-    printf("%d\n", checkersMakeMove(&game, 27, 36));
+    // printf("%d\n", checkersMakeMove(&game, 30, 26));
+    // printf("%d\n", checkersMakeMove(&game, 16, 20));
+    // printf("%d\n", checkersMakeMove(&game, 26, 21));
+    // printf("%d\n", checkersMakeMove(&game, 17, 26));
+    // printf("%d\n", checkersMakeMove(&game, 36, 30));
+    // printf("%d\n", checkersMakeMove(&game, 12, 17));
+
+    // printf("%d\n", checkersMakeMove(&game, 34, 29));
+    // printf("%d\n", checkersMakeMove(&game, 18, 23));
+    // printf("%d\n", checkersMakeMove(&game, 32, 27));
+    // printf("%d\n", checkersMakeMove(&game, 23, 34));
+    // printf("%d\n", checkersMakeMove(&game, 27, 22));
+    // printf("%d\n", checkersMakeMove(&game, 13, 18));
+    // printf("%d\n", checkersMakeMove(&game, 30, 25));
+    // printf("%d\n", checkersMakeMove(&game, 18, 27));
+    // printf("%d\n", checkersMakeMove(&game, 27, 36));
     
-    printf("%d\n", checkersMakeMove(&game, 41, 30));
-    printf("%d\n", checkersMakeMove(&game, 25, 16));
-    printf("%d\n", checkersMakeMove(&game, 30, 21));
-    printf("%d\n", checkersMakeMove(&game, 21, 12));
+    // printf("%d\n", checkersMakeMove(&game, 41, 30));
+    // printf("%d\n", checkersMakeMove(&game, 25, 16));
+    // printf("%d\n", checkersMakeMove(&game, 30, 21));
+    // printf("%d\n", checkersMakeMove(&game, 21, 12));
 
     // printf("%d\n", checkersMakeMove(&game, 30, 21));
     // printf("%d\n", checkersMakeMove(&game, 21, 12));
     // printf("%d\n", checkersMakeMove(&game, 12, 23));
-    checkersPrint(&game);
+    // checkersPrint(&game);
 
-    // // terminalCheckersBeginF(&game, stdin);
-    // // guiGameBegin(&game);
+    GameWindow window = {0};
+    checkersInit(&game, 1, 1, 1, 0);
+    // guiCreateWindow(
+    //     &window, 800, 800, 1,
+    //     FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | FLAG_WINDOW_ALWAYS_RUN
+    // );
+    // guiGameBeginW(&window, &game);
+    guiGameBegin(&game);
+
+    
+    // struct Board board = {0};
+    // boardInit(&board);
+    // memset(board.board, 0, sizeof(Piece) * board.boardSize);
+    // board.board[27] = (Piece) {
+    //     .alive = 1,
+    //     .type = PIECE_DARK_MAN,
+    //     .recentlyMoved = 0,
+    // };
+
+    // board.board[26] = (Piece) {
+    //     .alive = 1,
+    //     .type = PIECE_DARK_MAN,
+    //     .recentlyMoved = 0,
+    // };
+
+    // board.board[28] = (Piece) {
+    //     .alive = 1,
+    //     .type = PIECE_DARK_MAN,
+    //     .recentlyMoved = 0,
+    // };
+
+    // board.board[33] = (Piece) {
+    //     .alive = 1,
+    //     .type = PIECE_LIGHT_MAN,
+    //     .recentlyMoved = 0,
+    // };
+
+
+    // Checkers chek = {0};
+    // checkersInit(&chek, 1, 1, 1, 1);
+    // free(chek.checkersBoard.board);
+    // chek.checkersBoard.board = board.board;
+
+    // checkersPrint(&chek);
+
+    // printf("%d\n", checkersLoadCaptureStreak(&chek));
+    // int step = 0;
+    // while ((step = checkersCaptureStreakNext(&chek)) != -1) {
+    //     printf("%d\n", step);
+    // }
+    // checkersUnloadCaptureStreak(&chek);
+
+
 
     // struct Board board = {0};
     // boardInit(&board);
