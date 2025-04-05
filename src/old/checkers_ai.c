@@ -6,6 +6,8 @@
 #include <math.h>
 #include <limits.h>
 #include <time.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define false   0
 #define true    1
@@ -55,6 +57,7 @@ static inline int unlockMutex(struct Ai* ai);
 static struct AiMoves minimax(struct Ai* ai);
 
 struct Ai* checkersAiCreate(struct Checkers* gameboard) {
+    rprand_set_seed(time(NULL));
     if (!gameboard) {
         return NULL;
     }
@@ -134,7 +137,6 @@ static double minimaxr(struct Board* gameboard, int forceCapture, int depth, int
 static double heuristics(struct Board* gameboard);
 
 static void shuffle(struct Moves* array, size_t n) {
-    rprand_set_seed(time(NULL));
     if (n > 1) {
         for (size_t i = 0; i < n - 1; i++) {
             int r = rprand_get_value(0, n - 1);
