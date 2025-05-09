@@ -252,6 +252,8 @@ Piece boardGetPieceAtP(const Board* gameboard, Point piecePos) {
     return gameboard->board[POINT_TO_IDX(piecePos.x, piecePos.y)];
 }
 
+static inline size_t availableMovesForKing(const Board* gameboard, int piecePos, int** out);
+static inline size_t availableMovesForMan(const Board* gameboard, int piecePos, int illegalY, int** out);
 /* won't be calculated if the piece is already dead */
 size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int** out) {
     if (!gameboard || !validPos(piecePos) || !out) {
@@ -271,99 +273,14 @@ size_t boardGetAvailableMovesForPiece(const Board* gameboard, int piecePos, int*
     } else {
         illegalY = 1;
     }
-    size_t cap = 10;
+    
     size_t size = 0;
-    int* buf = malloc(sizeof(int) * cap);
-    if (!buf) {
-        perror("Could not malloc buffer");
-        *out = NULL;
-        return 0;
-    }
+    int* buf = NULL;
 
     if (isKing(p)) {
-        int offsetsIdx = 0;
-        int from = piecePos;
-        Point fromP = IDX_TO_POINT(piecePos);
-        int m = IS_EVEN_LINE(piecePos) ? 1 : -1;
-        while (offsetsIdx < 4) {
-            int to = 0;
-            Point toP = {0};
-            to = from + m * movementOffsets[offsetsIdx];
-            toP = IDX_TO_POINT(to);
-            Point vec = { /* to get the correct offsets for the direction in the inner loop */
-                .x = toP.x - fromP.x < 0 ? -1 : 1,
-                .y = toP.y - fromP.y < 0 ? -1 : 1,
-            };
-            to = from;
-            toP = IDX_TO_POINT(to);
-            int off = 0;
-            int hasCaptured = 0;
-            while (1) {
-                off = fromVecToOffset(vec, to);
-                to += off;
-                toP.x += vec.x;
-                toP.y += vec.y;
-                if (!validPos(to) || !validIndex(toP.x, toP.y)) {
-                    break;
-                }
-                p = gameboard->board + to;
-                if (isEmptyField(p)) {
-                    buf[size] = to;
-                    size += 1;
-                } else if (canCapture(gameboard, from, to, toP, vec)) {
-                    if (hasCaptured) {
-                        break;
-                    }
-                    hasCaptured = 1;
-                    /* kings may be able to jump beyond this point, so let's jump to the field behind the enemy piece */
-                    off = fromVecToOffset(vec, to);
-                    to += off;
-                    toP.x += vec.x;
-                    toP.y += vec.y;
-                    buf[size] = to;
-                    size += 1;
-                } else {
-                    break;
-                }
-
-                if (size >= cap) {
-                    cap *= 1.5f;
-                    int* tmp = realloc(buf, sizeof(int) * cap);
-                    if (!tmp) {
-                        perror("Could not realloc buffer");
-                        free(buf);
-                        *out = NULL;
-                        return 0;
-                    }
-                    buf = tmp;
-                }
-            }
-            offsetsIdx += 1;
-        }
+        size = availableMovesForKing(gameboard, piecePos, &buf);
     } else {
-        int from = piecePos;
-        int to = 0;
-        int m = IS_EVEN_LINE(piecePos) ? 1 : -1;
-        Point fromP = IDX_TO_POINT(from);
-        for (int i = 0; i < 4; i++) {
-            to = from + m * movementOffsets[i];
-            Point toP = IDX_TO_POINT(to);
-            /* y < 0, up; y > 0, down */
-            Point dir = {
-                .x = toP.x - fromP.x,
-                .y = toP.y - fromP.y, 
-            };
-            if (validPos(to) && abs(dir.x) == abs(dir.y)) {
-                if (canCapture(gameboard, from, to, toP, dir)) {
-                    int jmp = POINT_TO_IDX(toP.x + dir.x, toP.y + dir.y);
-                    buf[size] = jmp;
-                    size++;
-                } else if (isEmptyField(gameboard->board + to) && (-dir.y) * illegalY < 0) { /* just checking if signs are different */
-                    buf[size] = to;
-                    size++;
-                }
-            }
-        }
+        size = availableMovesForMan(gameboard, piecePos, illegalY, &buf);
     }
     
     if (size == 0) {
@@ -532,6 +449,8 @@ int boardCheckIfPlayerHasAvailableMoves(const Board* gameboard, int player) {
     }
 }
 
+static inline int kingCanCapture(const Board* gameboard, int pos); 
+static inline int manCanCapture(const Board* gameboard, int pos); 
 int boardCheckIfPieceCanCapture(const Board* gameboard, int pos) {
     if (!gameboard || !validPos(pos)) {
         return 0;
@@ -542,59 +461,10 @@ int boardCheckIfPieceCanCapture(const Board* gameboard, int pos) {
     }
 
     if (isKing(p)) {
-        int offsetsIdx = 0;
-        Point fromP = IDX_TO_POINT(pos);
-        int m = IS_EVEN_LINE(pos) ? 1 : -1;
-        while (offsetsIdx < 4) {
-            int to = 0;
-            Point toP = {0};
-            to = pos + m * movementOffsets[offsetsIdx];
-            toP = IDX_TO_POINT(to);
-            Point vec = { /* to get the correct offsets for the direction in the inner loop */
-                .x = toP.x - fromP.x < 0 ? -1 : 1,
-                .y = toP.y - fromP.y < 0 ? -1 : 1,
-            };
-            to = pos;
-            toP = IDX_TO_POINT(to);
-            while (1) {
-                int off = fromVecToOffset(vec, to);
-                to += off;
-                toP.x += vec.x;
-                toP.y += vec.y;
-                if (!validPos(to) || !validIndex(toP.x, toP.y)) {
-                    break;
-                }
-                p = gameboard->board + to;
-                if (isEmptyField(p)) {
-                    continue;
-                } else if (canCapture(gameboard, pos, to, toP, vec)) {
-                    return 1;
-                } else {
-                    break;
-                }
-            }
-            offsetsIdx += 1;
-        }
+        return kingCanCapture(gameboard, pos); 
     } else {
-        int to = 0;
-        int m = IS_EVEN_LINE(pos) ? 1 : -1;
-        Point fromP = IDX_TO_POINT(pos);
-        for (int i = 0; i < 4; i++) {
-            to = pos + m * movementOffsets[i];
-            Point toP = IDX_TO_POINT(to);
-            /* y < 0, up; y > 0, down */
-            Point dir = {
-                .x = toP.x - fromP.x,
-                .y = toP.y - fromP.y, 
-            };
-            if (validPos(to) && abs(dir.x) == abs(dir.y)) {
-                if (canCapture(gameboard, pos, to, toP, dir)) {
-                    return 1;
-                }
-            }
-        }
+        return manCanCapture(gameboard, pos);
     }
-    return 0;
 }
 
 int boardCheckIfPlayerCanCapture(const Board* gameboard, int player) {
@@ -831,76 +701,17 @@ int checkersGetWinner(const Checkers* game) {
     }
 }
 
-int checkersFlagIsRunning(const Checkers* game) {
-    if (game) {
-        return game->flags.run != 0;
-    }
-    return 0;
-}
+int checkersFlagIsRunning(const Checkers* game) { return game ? game->flags.run != 0 : 0; }
+int checkersFlagIsCurrentlyCapturing(const Checkers* game) { return game ? game->flags.currentlyCapturing != 0 : 0; }
+int checkersFlagIsForceCaptureOn(const Checkers* game) { return game ? game->flags.forceCapture != 0 : 0; }
+int checkersFlagIsAutoCapturesOn(const Checkers* game) { return game ? game->flags.autoCapture != 0 : 0; }
+int checkersFlagIsAIEnabled(const Checkers* game) { return game? game->flags.aiEnabled != 0 : 0; }
+int checkersFlagIsExternalCaptureHandleEnabled(const Checkers* game) { return game ? game->flags.externalCaptureHandling != 0 : 0; }
 
-int checkersFlagIsCurrentlyCapturing(const Checkers* game) {
-    if (game) {
-        return game->flags.currentlyCapturing != 0;
-    }
-    return 0;
-}
-
-int checkersFlagIsForceCaptureOn(const Checkers* game) {
-    if (game) {
-        return game->flags.forceCapture != 0;
-    }
-    return 0;
-}
-
-int checkersFlagIsAutoCapturesOn(const Checkers* game) {
-    if (game) {
-        return game->flags.autoCapture != 0;
-    }
-    return 0;
-}
-
-int checkersFlagIsAIEnabled(const Checkers* game) {
-    if (game) {
-        return game->flags.aiEnabled != 0;
-    }
-    return 0;
-}
-
-int checkersFlagIsExternalCaptureHandleEnabled(const Checkers* game) {
-    if (game) {
-        return game->flags.externalCaptureHandling != 0;
-    }
-    return 0;
-}
-
-int checkersFlagSetForceCapture(Checkers* game, int on) {
-    if (game) {
-        return (game->flags.forceCapture = on) != 0;
-    }
-    return 0;
-}
-
-int checkersFlagSetAutoCaptures(Checkers* game, int on) {
-    if (game) {
-        return (game->flags.autoCapture = on) != 0;
-    }
-    return 0;
-}
-
-int checkersFlagSetAI(Checkers* game, int on) {
-    if (game) {
-        return (game->flags.aiEnabled = on) != 0;
-    }
-    return 0;
-}
-
-
-int checkersFlagSetNeedsUpdate(Checkers* game) {
-    if (game) {
-        return (game->flags.needsUpdate = 1) != 0;
-    }
-    return 0;
-}
+int checkersFlagSetForceCapture(Checkers* game, int on) { return game ? (game->flags.forceCapture = on) != 0 : 0; }
+int checkersFlagSetAutoCaptures(Checkers* game, int on) { return game ? (game->flags.autoCapture = on) != 0 : 0; }
+int checkersFlagSetAI(Checkers* game, int on) { return game ? (game->flags.aiEnabled = on) != 0 : 0; }
+int checkersFlagSetNeedsUpdate(Checkers* game) { return game ? (game->flags.needsUpdate = 1) : 0; }
 
 
 Moves* checkersGetAvailableMovesForPlayer(const Checkers* game, size_t* out_size) {
@@ -1107,6 +918,192 @@ static int handleCaptureStreak(Checkers* game, int from, int to) {
     } else {
         ret = CHECKERS_NOT_LONGEST_PATH;
     }
+    return ret;
+}
+
+/**
+ * Just checks if a King piece can capture
+ */
+static inline int kingCanCapture(const Board* gameboard, int pos) {
+    Piece* p = NULL;
+    int offsetsIdx = 0;
+    Point fromP = IDX_TO_POINT(pos);
+    int m = IS_EVEN_LINE(pos) ? 1 : -1;
+    while (offsetsIdx < 4) {
+        int to = 0;
+        Point toP = {0};
+        to = pos + m * movementOffsets[offsetsIdx];
+        toP = IDX_TO_POINT(to);
+        Point vec = { /* to get the correct offsets for the direction in the inner loop */
+            .x = toP.x - fromP.x < 0 ? -1 : 1,
+            .y = toP.y - fromP.y < 0 ? -1 : 1,
+        };
+        to = pos;
+        toP = IDX_TO_POINT(to);
+        while (1) {
+            int off = fromVecToOffset(vec, to);
+            to += off;
+            toP.x += vec.x;
+            toP.y += vec.y;
+            if (!validPos(to) || !validIndex(toP.x, toP.y)) {
+                break;
+            }
+            p = gameboard->board + to;
+            if (isEmptyField(p)) {
+                continue;
+            } else if (canCapture(gameboard, pos, to, toP, vec)) {
+                return 1;
+            } else {
+                break;
+            }
+        }
+        offsetsIdx += 1;
+    }
+    return 0;
+}
+
+/**
+ * Just checks if a Man piece can capture
+ */
+static inline int manCanCapture(const Board* gameboard, int pos) {
+    int to = 0;
+    int m = IS_EVEN_LINE(pos) ? 1 : -1;
+    Point fromP = IDX_TO_POINT(pos);
+    for (int i = 0; i < 4; i++) {
+        to = pos + m * movementOffsets[i];
+        Point toP = IDX_TO_POINT(to);
+        /* y < 0, up; y > 0, down */
+        Point dir = {
+            .x = toP.x - fromP.x,
+            .y = toP.y - fromP.y, 
+        };
+        if (validPos(to) && abs(dir.x) == abs(dir.y)) {
+            if (canCapture(gameboard, pos, to, toP, dir)) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+/**
+ * Grabs all the available moves for a player's King piece.
+ * out shall point to an address that points to NULL
+ */
+static inline size_t availableMovesForKing(const Board* gameboard, int piecePos, int** out) {
+    size_t cap = 10;
+    size_t size = 0;
+    int* buf = malloc(sizeof(int) * cap);
+    if (!buf) {
+        perror("Could not malloc buffer");
+        *out = NULL;
+        return 0;
+    }
+    
+    Piece* p = NULL;
+    int offsetsIdx = 0;
+    int from = piecePos;
+    Point fromP = IDX_TO_POINT(piecePos);
+    int m = IS_EVEN_LINE(piecePos) ? 1 : -1;
+    while (offsetsIdx < 4) {
+        int to = 0;
+        Point toP = {0};
+        to = from + m * movementOffsets[offsetsIdx];
+        toP = IDX_TO_POINT(to);
+        Point vec = { /* to get the correct offsets for the direction in the inner loop */
+            .x = toP.x - fromP.x < 0 ? -1 : 1,
+            .y = toP.y - fromP.y < 0 ? -1 : 1,
+        };
+        to = from;
+        toP = IDX_TO_POINT(to);
+        int off = 0;
+        int hasCaptured = 0;
+        while (1) {
+            off = fromVecToOffset(vec, to);
+            to += off;
+            toP.x += vec.x;
+            toP.y += vec.y;
+            if (!validPos(to) || !validIndex(toP.x, toP.y)) {
+                break;
+            }
+            p = gameboard->board + to;
+            if (isEmptyField(p)) {
+                buf[size] = to;
+                size += 1;
+            } else if (canCapture(gameboard, from, to, toP, vec)) {
+                if (hasCaptured) {
+                    break;
+                }
+                hasCaptured = 1;
+                /* kings may be able to jump beyond this point, so let's jump to the field behind the enemy piece */
+                off = fromVecToOffset(vec, to);
+                to += off;
+                toP.x += vec.x;
+                toP.y += vec.y;
+                buf[size] = to;
+                size += 1;
+            } else {
+                break;
+            }
+
+            if (size >= cap) {
+                cap *= 1.5f;
+                int* tmp = realloc(buf, sizeof(int) * cap);
+                if (!tmp) {
+                    perror("Could not realloc buffer");
+                    free(buf);
+                    *out = NULL;
+                    return 0;
+                }
+                buf = tmp;
+            }
+        }
+        offsetsIdx += 1;
+    }
+    *out = buf;
+    return size;
+}
+
+/**
+ * Grabs all the available moves for a Man piece
+ * {out} shall point to an address that points to NULL
+ * {illegalY} refers to the direction to which the Man piece is
+ * NOT allowed to move towards
+ */
+static inline size_t availableMovesForMan(const Board* gameboard, int piecePos, int illegalY, int** out) {
+    size_t cap = 10;
+    size_t size = 0;
+    int* buf = malloc(sizeof(int) * cap);
+    if (!buf) {
+        perror("Could not malloc buffer");
+        *out = NULL;
+        return 0;
+    }
+    int from = piecePos;
+    int to = 0;
+    int m = IS_EVEN_LINE(piecePos) ? 1 : -1;
+    Point fromP = IDX_TO_POINT(from);
+    for (int i = 0; i < 4; i++) {
+        to = from + m * movementOffsets[i];
+        Point toP = IDX_TO_POINT(to);
+        /* y < 0, up; y > 0, down */
+        Point dir = {
+            .x = toP.x - fromP.x,
+            .y = toP.y - fromP.y, 
+        };
+        if (validPos(to) && abs(dir.x) == abs(dir.y)) {
+            if (canCapture(gameboard, from, to, toP, dir)) {
+                int jmp = POINT_TO_IDX(toP.x + dir.x, toP.y + dir.y);
+                buf[size] = jmp;
+                size++;
+            } else if (isEmptyField(gameboard->board + to) && (-dir.y) * illegalY < 0) { /* just checking if signs are different */
+                buf[size] = to;
+                size++;
+            }
+        }
+    }
+    *out = buf;
+    return size;
 }
 
  /**
@@ -1183,6 +1180,7 @@ static int validMove(Board* gameboard, int player, int from, int to) {
     }
 }
 
+/* sort of a duplicate of the above method (validMove). it should be kept like this (makes things easier) */
 /* movement/capture should be guaranteed to happen before this function is called  */
 static int movePiece(Board* gameboard, int from, int to) {
     gameboard->recentlyMovedPiece = to;

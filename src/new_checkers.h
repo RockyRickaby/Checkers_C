@@ -77,6 +77,7 @@ typedef enum PieceType {
     PIECE_DARK_MAN,
 } PieceType;
 
+/* WAITING states are not used. for now, please keep them here */
 typedef enum GameState {
     CSTATE_P1_TURN,
     CSTATE_P1_TURN_WAITING,
